@@ -1,0 +1,78 @@
+version: '3'
+
+vars:
+  PYTHON: python3
+  UV: uv
+
+tasks:
+  setup:
+    desc: Install dependencies using uv
+    cmds:
+      - "{{.UV}} sync --dev"
+
+  format:
+    desc: Format code with ruff
+    cmds:
+      - "{{.UV}} run ruff format src/ tests/"
+
+  lint:
+    desc: Lint code with ruff
+    cmds:
+      - "{{.UV}} run ruff check src/ tests/"
+
+  typecheck:
+    desc: Type check with mypy
+    cmds:
+      - "{{.UV}} run mypy src/"
+
+  test:
+    desc: Run tests with pytest
+    cmds:
+      - "{{.UV}} run pytest"
+    deps: [lint, typecheck]
+
+  test-ci:
+    desc: Run tests for CI
+    cmds:
+      - "{{.UV}} run pytest --cov=src --cov-report=xml"
+    deps: [lint, typecheck]
+
+  clean:
+    desc: Clean build artifacts and cache
+    cmds:
+      - rm -rf build/
+      - rm -rf dist/
+      - rm -rf .pytest_cache/
+      - rm -rf .mypy_cache/
+      - rm -rf .ruff_cache/
+      - find . -type d -name __pycache__ -exec rm -rf {} +
+
+  run:
+    desc: Run the application
+    cmds:
+      - "{{.UV}} run python -m src.main"
+
+  build:
+    desc: Build the application
+    cmds:
+      - mkdir -p build/
+      - "{{.UV}} build --out-dir build/"
+    deps: [test]
+
+  build-ci:
+    desc: Build for CI
+    cmds:
+      - mkdir -p build/
+      - "{{.UV}} build --out-dir build/"
+    deps: [test-ci]
+
+  dev:
+    desc: Run in development mode
+    cmds:
+      - "{{.UV}} run python -m src.main"
+    deps: [format, lint]
+
+  default:
+    desc: Run the application
+    cmds:
+      - task: run
