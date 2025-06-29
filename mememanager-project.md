@@ -87,7 +87,7 @@ It should be able to:
   - [ ] ~~File type validation~~
 - [x] Clipboard paste support:
   - [x] Detect image data in clipboard (file paths)
-  - [ ] **TODO: Handle binary clipboard image paste**
+  - [x] **COMPLETED: Handle binary clipboard image paste** (using PIL ImageGrab)
 - [x] File dialog for manual selection:
   - [x] Multiple file selection support
   - [x] Image format filtering
@@ -177,18 +177,22 @@ It should be able to:
   - [ ] Progress bars for long operations
   - [ ] Status messages
   - [ ] Confirmation dialogs for destructive actions
-- [ ] Add keyboard shortcuts:
-  - [ ] Ctrl+V for paste
+- [x] Add keyboard shortcuts:
+  - [x] **COMPLETED: Cmd+V/Ctrl+V for paste**
   - [ ] Ctrl+C for copy selected image
   - [ ] Delete key for removing images
   - [ ] Ctrl+F for search focus
 
-### Drag & Drop (When System Dependencies Resolved)
+### Drag & Drop (Optional Enhancement)
 
-- [ ] Re-add tkinterdnd2 with proper system library setup
-- [ ] Visual feedback during drag operations
-- [ ] Support multiple file drops
-- [ ] File type validation
+- [x] **COMPLETED: Graceful drag & drop handling**
+  - [x] Optional tkinterdnd2 integration
+  - [x] Fallback when system libraries unavailable
+  - [x] User feedback about drag & drop availability
+- [ ] **FUTURE: Enhanced drag & drop features**
+  - [ ] Visual feedback during drag operations
+  - [ ] Multiple file drop support
+  - [ ] File type validation during drop
 
 ## ✅ COMPLETED - Testing & Quality Assurance
 
@@ -234,15 +238,18 @@ It should be able to:
 
 ---
 
-## 📊 Current Status: ~75% Complete MVP
+## 📊 Current Status: ~80% Complete MVP
 
 ### ✅ **Working Now:**
 
 - Application launches with modern GUI
 - File dialog image import
+- Clipboard paste from screenshots and copied images
+- **NEW: Keyboard shortcuts (Cmd+V/Ctrl+V for paste)**
 - SQLite database with full schema
 - Real-time search functionality
 - Professional development setup
+- Graceful drag & drop support (when system libraries available)
 
 ### 🚨 **Immediate Next Steps:**
 

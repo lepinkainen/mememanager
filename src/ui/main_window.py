@@ -6,6 +6,15 @@ from tkinter import filedialog
 import customtkinter as ctk
 from PIL import Image
 
+# Try to import drag & drop support - it's optional
+try:
+    from tkinterdnd2 import DND_FILES, TkinterDnD
+
+    HAS_DND_SUPPORT = True
+except ImportError:
+    HAS_DND_SUPPORT = False
+    DND_FILES = None
+
 from ..database.manager import DatabaseManager
 from ..utils.image_handler import ImageHandler
 
@@ -45,6 +54,49 @@ class MemeManagerApp(ctk.CTk):
 
         # Cleanup orphaned thumbnails on startup
         self.cleanup_thumbnails()
+
+        # Set up keyboard shortcuts
+        self.setup_keyboard_shortcuts()
+
+        # Set up drag & drop functionality
+        self.setup_drag_drop()
+
+    def setup_keyboard_shortcuts(self) -> None:
+        """Set up keyboard shortcuts for the application."""
+        # Bind keyboard shortcuts for paste functionality
+        self.bind("<Command-v>", lambda e: self.paste_from_clipboard())  # macOS
+        self.bind("<Control-v>", lambda e: self.paste_from_clipboard())  # Windows/Linux
+
+        # Ensure the window can receive keyboard focus
+        self.focus_set()
+
+    def setup_drag_drop(self) -> None:
+        """Set up drag & drop functionality for the application."""
+        if not HAS_DND_SUPPORT:
+            print("⚠️  Drag & drop not available - tkinterdnd2 library not found")
+            return
+
+        try:
+            # Enable drag & drop on the main window and drop zone
+            self.drop_target_register(DND_FILES)
+            self.dnd_bind("<<Drop>>", self.on_drop)
+            print("✅ Drag & drop functionality enabled")
+            self.update_drop_zone_text(dnd_available=True)
+        except Exception as e:
+            print(f"⚠️  Could not enable drag & drop: {e}")
+            # Update the drop zone text to reflect that drag & drop is not available
+            self.update_drop_zone_text(dnd_available=False)
+
+    def update_drop_zone_text(self, dnd_available: bool) -> None:
+        """Update the drop zone text based on drag & drop availability."""
+        if dnd_available:
+            text = "📁 Drag & drop images here or use the import buttons\n✨ Supports multiple files and Cmd+V/Ctrl+V paste"
+        else:
+            text = "📁 Use the import buttons to add images\n✨ Supports Cmd+V/Ctrl+V paste"
+
+        # Update the drop label if it exists
+        if hasattr(self, "drop_label"):
+            self.drop_label.configure(text=text)
 
     def setup_ui(self) -> None:
         """Set up the user interface layout."""
@@ -144,9 +196,10 @@ class MemeManagerApp(ctk.CTk):
         self.drop_zone = ctk.CTkFrame(self.main_frame)
         self.drop_zone.grid(row=0, column=0, padx=20, pady=20, sticky="ew")
 
+        # Set initial drop zone text - will be updated after drag & drop setup
         self.drop_label = ctk.CTkLabel(
             self.drop_zone,
-            text="📁 Use the import buttons to add images\n(Drag & drop coming soon)",
+            text="📁 Use the import buttons to add images\n✨ Supports Cmd+V/Ctrl+V paste",
             font=ctk.CTkFont(size=18),
             height=100,
         )
@@ -183,6 +236,24 @@ class MemeManagerApp(ctk.CTk):
 
         if files:
             self.import_files([Path(file) for file in files])
+
+    def on_drop(self, event: object) -> None:
+        """Handle drag & drop events."""
+        # Parse the dropped files from the event data
+        files = self.tk.splitlist(event.data)  # type: ignore
+
+        # Filter for existing files and convert to Path objects
+        file_paths = []
+        for file in files:
+            file_path = Path(file)
+            if file_path.exists() and file_path.is_file():
+                file_paths.append(file_path)
+
+        # Import the dropped files using existing import logic
+        if file_paths:
+            self.import_files(file_paths)
+        else:
+            self.update_status("No valid image files were dropped")
 
     def paste_from_clipboard(self) -> None:
         """Import image from clipboard."""
