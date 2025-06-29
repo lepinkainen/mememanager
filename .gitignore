@@ -190,7 +190,7 @@ local.properties
 *~
 
 # Project specific
-storage/memes/
+storage/
 *.db
 *.sqlite
 *.sqlite3

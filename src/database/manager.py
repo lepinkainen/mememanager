@@ -51,7 +51,9 @@ class DatabaseManager:
             """)
 
             # Create indexes for better search performance
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_images_filename ON images(filename)")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_images_filename ON images(filename)"
+            )
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
 
             conn.commit()
@@ -62,17 +64,24 @@ class DatabaseManager:
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO images (filename, original_name, path, created_date, updated_date)
                 VALUES (?, ?, ?, ?, ?)
-            """, (filename, original_name, path, now, now))
+            """,
+                (filename, original_name, path, now, now),
+            )
             result = cursor.lastrowid
             if result is None:
                 raise RuntimeError("Failed to insert image")
             return result
 
-    def update_image(self, image_id: int, filename: str | None = None,
-                    original_name: str | None = None) -> bool:
+    def update_image(
+        self,
+        image_id: int,
+        filename: str | None = None,
+        original_name: str | None = None,
+    ) -> bool:
         """Update image information."""
         if not filename and not original_name:
             return False
@@ -161,8 +170,10 @@ class DatabaseManager:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute("INSERT INTO image_tags (image_id, tag_id) VALUES (?, ?)",
-                             (image_id, tag_id))
+                cursor.execute(
+                    "INSERT INTO image_tags (image_id, tag_id) VALUES (?, ?)",
+                    (image_id, tag_id),
+                )
                 return True
         except sqlite3.IntegrityError:
             return False  # Association already exists
@@ -171,8 +182,10 @@ class DatabaseManager:
         """Remove tag association from an image."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM image_tags WHERE image_id = ? AND tag_id = ?",
-                         (image_id, tag_id))
+            cursor.execute(
+                "DELETE FROM image_tags WHERE image_id = ? AND tag_id = ?",
+                (image_id, tag_id),
+            )
             return cursor.rowcount > 0
 
     def get_image_tags(self, image_id: int) -> list[dict[str, Any]]:
@@ -180,12 +193,15 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT t.* FROM tags t
                 JOIN image_tags it ON t.id = it.tag_id
                 WHERE it.image_id = ?
                 ORDER BY t.name
-            """, (image_id,))
+            """,
+                (image_id,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def search_images(self, query: str) -> list[dict[str, Any]]:
@@ -197,13 +213,16 @@ class DatabaseManager:
             cursor = conn.cursor()
 
             # Search in image names and tags
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT DISTINCT i.* FROM images i
                 LEFT JOIN image_tags it ON i.id = it.image_id
                 LEFT JOIN tags t ON it.tag_id = t.id
                 WHERE i.filename LIKE ? OR i.original_name LIKE ? OR t.name LIKE ?
                 ORDER BY i.created_date DESC
-            """, (search_term, search_term, search_term))
+            """,
+                (search_term, search_term, search_term),
+            )
 
             return [dict(row) for row in cursor.fetchall()]
 
@@ -212,13 +231,16 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT i.* FROM images i
                 JOIN image_tags it ON i.id = it.image_id
                 JOIN tags t ON it.tag_id = t.id
                 WHERE t.name = ?
                 ORDER BY i.created_date DESC
-            """, (tag_name,))
+            """,
+                (tag_name,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_database_stats(self) -> dict[str, int]:
@@ -238,5 +260,5 @@ class DatabaseManager:
             return {
                 "images": image_count,
                 "tags": tag_count,
-                "associations": association_count
+                "associations": association_count,
             }

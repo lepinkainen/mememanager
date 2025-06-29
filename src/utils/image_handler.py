@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from PIL import Image, ImageTk
+from PIL import Image
 
 
 class ImageHandler:
@@ -22,11 +22,17 @@ class ImageHandler:
         self.storage_root = Path(storage_root)
         self.storage_root.mkdir(parents=True, exist_ok=True)
 
+        # Initialize thumbnail cache directory
+        self.thumbnail_root = Path("storage/thumbnails")
+        self.thumbnail_root.mkdir(parents=True, exist_ok=True)
+
     def is_supported_format(self, file_path: Path) -> bool:
         """Check if the file format is supported."""
         return file_path.suffix.lower() in self.SUPPORTED_FORMATS
 
-    def generate_unique_filename(self, original_name: str, extension: str | None = None) -> str:
+    def generate_unique_filename(
+        self, original_name: str, extension: str | None = None
+    ) -> str:
         """Generate a unique filename to avoid conflicts."""
         if extension is None:
             extension = Path(original_name).suffix
@@ -67,11 +73,16 @@ class ImageHandler:
                     rgb_img = Image.new("RGB", img.size, (255, 255, 255))
                     if img.mode == "P":
                         img = img.convert("RGBA")
-                    rgb_img.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
+                    rgb_img.paste(
+                        img, mask=img.split()[-1] if img.mode == "RGBA" else None
+                    )
                     img = rgb_img
 
                 # Resize if too large
-                if img.size[0] > self.MAX_IMAGE_SIZE[0] or img.size[1] > self.MAX_IMAGE_SIZE[1]:
+                if (
+                    img.size[0] > self.MAX_IMAGE_SIZE[0]
+                    or img.size[1] > self.MAX_IMAGE_SIZE[1]
+                ):
                     img.thumbnail(self.MAX_IMAGE_SIZE, Image.Resampling.LANCZOS)
 
                 # Save optimized image
@@ -83,36 +94,61 @@ class ImageHandler:
 
         return filename, storage_path
 
-    def save_image_from_clipboard(self, original_name: str | None = None) -> tuple[str, Path] | None:
+    def save_image_from_clipboard(
+        self, original_name: str | None = None
+    ) -> tuple[str, Path] | None:
         """Save an image from clipboard to storage."""
         try:
-            root = tk.Tk()
-            root.withdraw()  # Hide the window
-
-            # Try to get image from clipboard
+            # First try to get image directly from clipboard using PIL
             try:
-                clipboard_data = root.clipboard_get()
-                # If we get text, it might be a file path or URL
-                if clipboard_data and Path(clipboard_data).exists():
-                    return self.save_image(Path(clipboard_data), original_name or "clipboard_image")
-            except tk.TclError:
+                from PIL import ImageGrab
+
+                img = ImageGrab.grabclipboard()
+                if img and isinstance(img, Image.Image):
+                    # Create temporary file to save clipboard image
+                    temp_path = Path("temp_clipboard.png")
+                    img.save(temp_path, "PNG")
+                    result = self.save_image(
+                        temp_path, original_name or "clipboard_image.png"
+                    )
+                    # Clean up temp file
+                    if temp_path.exists():
+                        temp_path.unlink()
+                    return result
+            except ImportError:
+                # ImageGrab not available on this platform
+                pass
+            except Exception:
+                # Error getting image from clipboard
                 pass
 
-            # Try to get binary image data (this is platform-specific and may not work)
+            # Fallback: try to get file path from clipboard
             try:
-                # This is a simplified approach - in practice, you'd need platform-specific
-                # clipboard handling for binary image data
-                img = ImageTk.getimage()
-                if img:
-                    temp_path = Path("temp_clipboard.png")
-                    img.save(temp_path)
-                    result = self.save_image(temp_path, original_name or "clipboard_image.png")
-                    temp_path.unlink()  # Clean up temp file
-                    return result
+                root = tk.Tk()
+                root.withdraw()  # Hide the window
+
+                clipboard_data = root.clipboard_get()
+                root.destroy()
+
+                # If we get text, it might be a file path
+                if clipboard_data and Path(clipboard_data).exists():
+                    clipboard_path = Path(clipboard_data)
+                    if clipboard_path.suffix.lower() in {
+                        ".png",
+                        ".jpg",
+                        ".jpeg",
+                        ".gif",
+                        ".webp",
+                    }:
+                        return self.save_image(
+                            clipboard_path, original_name or "clipboard_image"
+                        )
+            except tk.TclError:
+                # No text data in clipboard
+                pass
             except Exception:
                 pass
 
-            root.destroy()
             return None
 
         except Exception:
@@ -135,7 +171,7 @@ class ImageHandler:
                     "size": img.size,
                     "format": img.format,
                     "mode": img.mode,
-                    "file_size": image_path.stat().st_size
+                    "file_size": image_path.stat().st_size,
                 }
         except Exception:
             return None
@@ -213,5 +249,97 @@ class ImageHandler:
         return {
             "total_size_bytes": total_size,
             "total_size_mb": round(total_size / (1024 * 1024), 2),
-            "file_count": file_count
+            "file_count": file_count,
         }
+
+    def get_thumbnail_path(self, image_path: Path) -> Path:
+        """Get the corresponding thumbnail path for an image."""
+        # Extract year/month from image path
+        parts = image_path.parts
+        if len(parts) >= 2 and parts[-3:-1] == ("2025", "06"):  # Handle date structure
+            year_month = f"{parts[-3]}/{parts[-2]}"
+        else:
+            # Fallback to current date structure
+            now = datetime.now()
+            year_month = now.strftime("%Y/%m")
+
+        # Create thumbnail directory structure
+        thumb_dir = self.thumbnail_root / year_month
+        thumb_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate thumbnail filename
+        stem = image_path.stem
+        thumb_filename = f"{stem}.thumb.jpg"
+        return thumb_dir / thumb_filename
+
+    def get_or_create_thumbnail(self, image_path: Path) -> Path | None:
+        """Get cached thumbnail or create new one if needed."""
+        if not image_path.exists():
+            return None
+
+        thumb_path = self.get_thumbnail_path(image_path)
+
+        # Check if thumbnail exists and is newer than source
+        if thumb_path.exists():
+            try:
+                source_mtime = image_path.stat().st_mtime
+                thumb_mtime = thumb_path.stat().st_mtime
+                if thumb_mtime >= source_mtime:
+                    return thumb_path
+            except OSError:
+                pass
+
+        # Create new thumbnail
+        try:
+            thumbnail = self.create_thumbnail(image_path)
+            if thumbnail:
+                # Convert to RGB and save as JPEG
+                if thumbnail.mode in ("RGBA", "P"):
+                    rgb_thumb = Image.new("RGB", thumbnail.size, (255, 255, 255))
+                    if thumbnail.mode == "P":
+                        thumbnail = thumbnail.convert("RGBA")
+                    rgb_thumb.paste(
+                        thumbnail,
+                        mask=thumbnail.split()[-1]
+                        if thumbnail.mode == "RGBA"
+                        else None,
+                    )
+                    thumbnail = rgb_thumb
+
+                thumbnail.save(thumb_path, "JPEG", quality=85, optimize=True)
+                return thumb_path
+        except Exception as e:
+            print(f"Error creating thumbnail for {image_path}: {e}")
+
+        return None
+
+    def cleanup_orphaned_thumbnails(self, valid_image_paths: set[Path]) -> int:
+        """Remove thumbnails for images that no longer exist."""
+        removed_count = 0
+
+        for thumb_path in self.thumbnail_root.rglob("*.thumb.jpg"):
+            # Reconstruct original image path from thumbnail path
+            relative_path = thumb_path.relative_to(self.thumbnail_root)
+            year_month = str(relative_path.parent)
+
+            # Remove .thumb.jpg and find possible original extensions
+            base_name = thumb_path.stem.replace(".thumb", "")
+
+            # Check if any valid image with this base name exists
+            found_match = False
+            for image_path in valid_image_paths:
+                if (
+                    image_path.stem == base_name
+                    and str(image_path).find(year_month) != -1
+                ):
+                    found_match = True
+                    break
+
+            if not found_match:
+                try:
+                    thumb_path.unlink()
+                    removed_count += 1
+                except OSError:
+                    pass
+
+        return removed_count
