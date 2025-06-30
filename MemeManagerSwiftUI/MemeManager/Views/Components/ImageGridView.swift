@@ -1,17 +1,27 @@
 import SwiftUI
 
 struct ImageGridView: View {
+    @EnvironmentObject var viewModel: MemeManagerViewModel
     private let columns = Array(repeating: GridItem(.flexible(), spacing: AppConstants.gridSpacing), count: AppConstants.gridColumns)
     
     var body: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: AppConstants.gridSpacing) {
-                // TODO: Replace with actual image data
-                ForEach(0..<10, id: \.self) { index in
-                    ImageThumbnailView(imageName: "Placeholder \(index)")
+                ForEach(viewModel.images) { image in
+                    ImageThumbnailView(image: image)
+                        .onTapGesture {
+                            viewModel.selectedImage = image
+                        }
                 }
             }
             .padding()
+        }
+        .sheet(item: Binding<MemeImage?>(
+            get: { viewModel.selectedImage },
+            set: { viewModel.selectedImage = $0 }
+        )) { image in
+            ImageDetailView(image: image)
+                .environmentObject(viewModel)
         }
     }
 }

@@ -1,9 +1,14 @@
 import SwiftUI
 
 struct MainView: View {
+    @EnvironmentObject var viewModel: MemeManagerViewModel
+    
     var body: some View {
         VStack {
-            if true { // TODO: Replace with actual data check
+            if viewModel.isLoading {
+                ProgressView("Loading...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.images.isEmpty {
                 EmptyStateView()
             } else {
                 ImageGridView()
@@ -14,6 +19,8 @@ struct MainView: View {
 }
 
 struct EmptyStateView: View {
+    @EnvironmentObject var viewModel: MemeManagerViewModel
+    
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "photo.on.rectangle.angled")
@@ -24,17 +31,29 @@ struct EmptyStateView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Import some images to get started")
+            Text("Drag & drop images here or use the import buttons")
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
             
-            Button(action: {
-                // TODO: Implement import
-            }) {
-                Text("Import Images")
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 8)
+            HStack(spacing: 16) {
+                Button("Import Images") {
+                    let panel = NSOpenPanel()
+                    panel.allowedContentTypes = [.image]
+                    panel.allowsMultipleSelection = true
+                    panel.canChooseDirectories = false
+                    panel.canChooseFiles = true
+                    
+                    if panel.runModal() == .OK {
+                        viewModel.importImages(from: panel.urls)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                
+                Button("From Clipboard") {
+                    viewModel.importFromClipboard()
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

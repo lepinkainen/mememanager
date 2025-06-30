@@ -111,7 +111,7 @@ class DatabaseService: ObservableObject {
             var memeImages: [MemeImage] = []
             for row in try db.prepare(images.order(imageCreatedDate.desc)) {
                 let image = MemeImage(
-                    id: row[imageId],
+                    databaseId: row[imageId],
                     filename: row[imageFilename],
                     originalName: row[imageOriginalName],
                     path: row[imagePath],
@@ -135,7 +135,7 @@ class DatabaseService: ObservableObject {
             let query = images.filter(imageId == id)
             if let row = try db.pluck(query) {
                 return MemeImage(
-                    id: row[imageId],
+                    databaseId: row[imageId],
                     filename: row[imageFilename],
                     originalName: row[imageOriginalName],
                     path: row[imagePath],
@@ -151,7 +151,7 @@ class DatabaseService: ObservableObject {
     }
     
     func updateImage(_ image: MemeImage) -> Bool {
-        guard let db = db, let id = image.id else { return false }
+        guard let db = db, let id = image.databaseId else { return false }
         
         do {
             let imageToUpdate = images.filter(imageId == id)
@@ -362,7 +362,7 @@ class DatabaseService: ObservableObject {
             
             for row in try db.prepare(searchQuery) {
                 let image = MemeImage(
-                    id: row[imageId],
+                    databaseId: row[imageId],
                     filename: row[imageFilename],
                     originalName: row[imageOriginalName],
                     path: row[imagePath],

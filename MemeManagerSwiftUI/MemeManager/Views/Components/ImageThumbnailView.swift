@@ -1,33 +1,92 @@
 import SwiftUI
 
 struct ImageThumbnailView: View {
-    let imageName: String
+    let image: MemeImage
+    @EnvironmentObject var viewModel: MemeManagerViewModel
+    @State private var showingRenameAlert = false
+    @State private var newName = ""
     
     var body: some View {
-        VStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.3))
-                .frame(width: AppConstants.thumbnailSize.width, height: AppConstants.thumbnailSize.height)
-                .overlay(
-                    Image(systemName: "photo")
-                        .font(.system(size: 32))
-                        .foregroundColor(.secondary)
-                )
+        VStack(spacing: 8) {
+            AsyncImage(url: URL(fileURLWithPath: image.path)) { phase in
+                switch phase {
+                case .success(let loadedImage):
+                    loadedImage
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: AppConstants.thumbnailSize.width, height: AppConstants.thumbnailSize.height)
+                        .clipped()
+                        .cornerRadius(8)
+                case .failure(_):
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.red.opacity(0.3))
+                        .frame(width: AppConstants.thumbnailSize.width, height: AppConstants.thumbnailSize.height)
+                        .overlay(
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 24))
+                                .foregroundColor(.red)
+                        )
+                case .empty:
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: AppConstants.thumbnailSize.width, height: AppConstants.thumbnailSize.height)
+                        .overlay(
+                            ProgressView()
+                        )
+                @unknown default:
+                    EmptyView()
+                }
+            }
             
-            Text(imageName)
-                .font(.caption)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 2) {
+                Text(image.originalName)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                
+                if !image.tags.isEmpty {
+                    HStack {
+                        ForEach(image.tags.prefix(3), id: \.id) { tag in
+                            Text(tag.name)
+                                .font(.caption2)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.blue.opacity(0.2))
+                                .foregroundColor(.blue)
+                                .cornerRadius(4)
+                        }
+                        if image.tags.count > 3 {
+                            Text("+\(image.tags.count - 3)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            .frame(width: AppConstants.thumbnailSize.width)
         }
         .contextMenu {
-            Button("Copy") {
-                // TODO: Implement copy to clipboard
+            Button("Copy to Clipboard") {
+                viewModel.copyImageToClipboard(image)
             }
+            
             Button("Rename") {
-                // TODO: Implement rename
+                newName = image.originalName
+                showingRenameAlert = true
             }
-            Button("Delete") {
-                // TODO: Implement delete
+            
+            Divider()
+            
+            Button("Delete", role: .destructive) {
+                viewModel.deleteImage(image)
+            }
+        }
+        .alert("Rename Image", isPresented: $showingRenameAlert) {
+            TextField("New name", text: $newName)
+            Button("Cancel", role: .cancel) { }
+            Button("Rename") {
+                // TODO: Implement rename functionality
             }
         }
     }
