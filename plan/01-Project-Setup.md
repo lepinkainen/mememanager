@@ -1,15 +1,18 @@
 # Phase 1: Project Setup & Foundation
 
 ## Overview
+
 Set up the Xcode project structure and foundational components for the SwiftUI Meme Manager.
 
 ## Prerequisites
+
 - [ ] Xcode 15.0+ installed
 - [ ] macOS 14.0+ target (for latest SwiftUI features)
 - [ ] Swift 5.9+ support
 - [ ] Understanding of existing Python implementation
 
 ## Step 1: Xcode Project Creation
+
 - [ ] Open Xcode
 - [ ] Create new project: **macOS** → **App**
 - [ ] Project settings:
@@ -22,6 +25,7 @@ Set up the Xcode project structure and foundational components for the SwiftUI M
 - [ ] Save in: `/Users/shrike/projects/mememanager/MemeManagerSwiftUI/`
 
 ## Step 2: Project Structure Setup
+
 Create the following folder structure in Xcode:
 
 ```
@@ -64,14 +68,17 @@ MemeManager/
 ```
 
 ### File Creation Checklist:
+
 - [ ] Create folder groups in Xcode (right-click → New Group)
 - [ ] Create empty Swift files for each component listed above
 - [ ] Verify project builds with empty files
 
 ## Step 3: Dependencies & Package Manager
+
 Add the following Swift Package Dependencies:
 
 ### SQLite Support:
+
 - [ ] Add SQLite.swift package:
   - [ ] Xcode → File → Add Package Dependencies
   - [ ] URL: `https://github.com/stephencelis/SQLite.swift`
@@ -79,6 +86,7 @@ Add the following Swift Package Dependencies:
   - [ ] Add to target: MemeManager
 
 ### Image Processing (if needed):
+
 - [ ] Consider Kingfisher for advanced image handling:
   - [ ] URL: `https://github.com/onevcat/Kingfisher`
   - [ ] **Note**: Evaluate if needed or if native SwiftUI is sufficient
@@ -86,6 +94,7 @@ Add the following Swift Package Dependencies:
 ## Step 4: App Configuration
 
 ### App Entitlements (MemeManager.entitlements):
+
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -102,6 +111,7 @@ Add the following Swift Package Dependencies:
 ```
 
 ### Minimum Target Setup:
+
 - [ ] Set deployment target to macOS 14.0
 - [ ] Configure Info.plist for file type associations:
   - [ ] Add supported image file types (PNG, JPG, GIF, WEBP)
@@ -110,6 +120,7 @@ Add the following Swift Package Dependencies:
 ## Step 5: Basic App Structure
 
 ### MemeManagerApp.swift:
+
 ```swift
 import SwiftUI
 
@@ -126,6 +137,7 @@ struct MemeManagerApp: App {
 ```
 
 ### ContentView.swift (Initial):
+
 ```swift
 import SwiftUI
 
@@ -144,6 +156,7 @@ struct ContentView: View {
 ## Step 6: Constants Setup
 
 ### Constants.swift:
+
 ```swift
 import Foundation
 
@@ -152,14 +165,14 @@ struct AppConstants {
     static let storageDirectory = "MemeManager"
     static let thumbnailDirectory = "Thumbnails"
     static let databaseName = "MemeManager.db"
-    
+
     // Image Processing
     static let thumbnailSize = CGSize(width: 200, height: 200)
     static let maxImageSize = CGSize(width: 2048, height: 2048)
-    
+
     // Supported Formats
     static let supportedImageTypes = ["png", "jpg", "jpeg", "gif", "webp", "bmp"]
-    
+
     // UI
     static let gridColumns = 4
     static let gridSpacing: CGFloat = 10
@@ -167,13 +180,16 @@ struct AppConstants {
 ```
 
 ## Step 7: Build & Test
+
 - [ ] Build project (⌘+B) - should compile without errors
 - [ ] Run project (⌘+R) - should show basic window
 - [ ] Verify window sizing and basic navigation structure
 - [ ] Check that all groups and files are properly organized
 
 ## Step 8: Version Control Integration
+
 - [ ] Add `.gitignore` for Xcode projects:
+
 ```gitignore
 # Xcode
 *.xcodeproj/*
@@ -203,10 +219,12 @@ xcuserdata/
 *.xccheckout
 *.xcscmblueprint
 ```
+
 - [ ] Commit initial project setup
 - [ ] Tag as `swiftui-v0.1-setup`
 
 ## Validation Checklist
+
 - [ ] ✅ Xcode project creates and builds successfully
 - [ ] ✅ Basic window appears with navigation structure
 - [ ] ✅ All required folders and files are created
@@ -215,13 +233,16 @@ xcuserdata/
 - [ ] ✅ Project is committed to git
 
 ## Common Issues & Solutions
+
 - **Build errors**: Check that all files have proper import statements
 - **Package dependency issues**: Clean build folder and re-add packages
 - **Entitlements not working**: Verify signing settings in project configuration
 - **Window sizing issues**: Check ContentView frame modifiers
 
 ## Next Steps
+
 Once this phase is complete, proceed to **02-Core-Architecture.md** for database and model setup.
 
 ---
+
 **Estimated Time**: 2-4 hours depending on Xcode familiarity

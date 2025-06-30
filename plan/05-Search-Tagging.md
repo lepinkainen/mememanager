@@ -1,9 +1,11 @@
 # Phase 5: Search & Tagging System
 
 ## Overview
+
 Implement comprehensive search functionality and tag management system that matches the Python implementation's capabilities.
 
 ## Prerequisites
+
 - [ ] Phase 4 (Image Management) completed
 - [ ] Database service with tag operations working
 - [ ] UI foundation properly implemented
@@ -12,6 +14,7 @@ Implement comprehensive search functionality and tag management system that matc
 ## Step 1: Enhanced Search Implementation
 
 ### SearchViewModel.swift - Dedicated Search Logic:
+
 ```swift
 import SwiftUI
 import Combine
@@ -23,19 +26,19 @@ class SearchViewModel: ObservableObject {
     @Published var isSearching: Bool = false
     @Published var searchSuggestions: [String] = []
     @Published var recentSearches: [String] = []
-    
+
     private var searchCancellable: AnyCancellable?
     private var serviceManager: ServiceManager?
-    
+
     init() {
         setupSearchBinding()
         loadRecentSearches()
     }
-    
+
     func configure(with serviceManager: ServiceManager) {
         self.serviceManager = serviceManager
     }
-    
+
     private func setupSearchBinding() {
         searchCancellable = $searchText
             .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
@@ -46,25 +49,25 @@ class SearchViewModel: ObservableObject {
                 }
             }
     }
-    
+
     func performSearch(query: String) async {
         guard let serviceManager = serviceManager else { return }
-        
+
         if query.isEmpty {
             searchResults = []
             isSearching = false
             return
         }
-        
+
         isSearching = true
-        
+
         do {
             let results = try await serviceManager.database.searchImages(query: query)
-            
+
             await MainActor.run {
                 self.searchResults = results
                 self.isSearching = false
-                
+
                 // Add to recent searches if not empty
                 if !query.isEmpty && !self.recentSearches.contains(query) {
                     self.recentSearches.insert(query, at: 0)
@@ -81,16 +84,16 @@ class SearchViewModel: ObservableObject {
             }
         }
     }
-    
+
     func clearSearch() {
         searchText = ""
         searchResults = []
     }
-    
+
     func selectRecentSearch(_ search: String) {
         searchText = search
     }
-    
+
     // MARK: - Persistence
     private func loadRecentSearches() {
         if let data = UserDefaults.standard.data(forKey: "RecentSearches"),
@@ -98,7 +101,7 @@ class SearchViewModel: ObservableObject {
             recentSearches = searches
         }
     }
-    
+
     private func saveRecentSearches() {
         if let data = try? JSONEncoder().encode(recentSearches) {
             UserDefaults.standard.set(data, forKey: "RecentSearches")
@@ -108,6 +111,7 @@ class SearchViewModel: ObservableObject {
 ```
 
 ### Enhanced SearchSectionView.swift:
+
 ```swift
 import SwiftUI
 
@@ -116,18 +120,18 @@ struct SearchSectionView: View {
     @EnvironmentObject var mainViewModel: MainViewModel
     @EnvironmentObject var serviceManager: ServiceManager
     @State private var showingSearchSuggestions = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Search & Filter")
                 .font(.headline)
-            
+
             // Search field with suggestions
             VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
-                    
+
                     TextField("Search memes...", text: $searchViewModel.searchText)
                         .textFieldStyle(.plain)
                         .onSubmit {
@@ -136,12 +140,12 @@ struct SearchSectionView: View {
                         .onTapGesture {
                             showingSearchSuggestions = !searchViewModel.recentSearches.isEmpty
                         }
-                    
+
                     if searchViewModel.isSearching {
                         ProgressView()
                             .scaleEffect(0.8)
                     }
-                    
+
                     if !searchViewModel.searchText.isEmpty {
                         Button(action: {
                             searchViewModel.clearSearch()
@@ -159,7 +163,7 @@ struct SearchSectionView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                 )
-                
+
                 // Search suggestions dropdown
                 if showingSearchSuggestions && !searchViewModel.recentSearches.isEmpty {
                     VStack(alignment: .leading, spacing: 0) {
@@ -192,7 +196,7 @@ struct SearchSectionView: View {
                     .padding(.top, 2)
                 }
             }
-            
+
             // Quick filter buttons
             QuickFilterView()
                 .environmentObject(searchViewModel)
@@ -212,13 +216,13 @@ struct SearchSectionView: View {
 struct QuickFilterView: View {
     @EnvironmentObject var searchViewModel: SearchViewModel
     @State private var popularTags: [Tag] = []
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Quick Filters")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            
+
             LazyVGrid(columns: [
                 GridItem(.adaptive(minimum: 60, maximum: 100), spacing: 4)
             ], spacing: 4) {
@@ -235,7 +239,7 @@ struct QuickFilterView: View {
             await loadPopularTags()
         }
     }
-    
+
     private func loadPopularTags() async {
         // Load most frequently used tags
         // Implementation depends on database service
@@ -244,6 +248,7 @@ struct QuickFilterView: View {
 ```
 
 ### Step 1 Checklist:
+
 - [ ] Create `SearchViewModel` with proper debouncing
 - [ ] Implement real-time search with loading states
 - [ ] Add search suggestions and recent searches
@@ -254,6 +259,7 @@ struct QuickFilterView: View {
 ## Step 2: Tag Management System
 
 ### TagManagementView.swift - Tag Editor:
+
 ```swift
 import SwiftUI
 
@@ -264,10 +270,10 @@ struct TagManagementView: View {
     @State private var availableTags: [Tag] = []
     @State private var filteredTags: [Tag] = []
     @State private var isLoading = false
-    
+
     @EnvironmentObject var serviceManager: ServiceManager
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         VStack(spacing: 16) {
             // Header
@@ -275,18 +281,18 @@ struct TagManagementView: View {
                 Text("Edit Tags")
                     .font(.title2)
                     .fontWeight(.bold)
-                
+
                 Text(image.displayName)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
-            
+
             // Current tags display
             VStack(alignment: .leading, spacing: 8) {
                 Text("Current Tags")
                     .font(.headline)
-                
+
                 if currentTags.isEmpty {
                     Text("No tags assigned")
                         .foregroundColor(.secondary)
@@ -304,27 +310,27 @@ struct TagManagementView: View {
                 }
             }
             .frame(minHeight: 60)
-            
+
             Divider()
-            
+
             // Add new tag section
             VStack(alignment: .leading, spacing: 8) {
                 Text("Add Tags")
                     .font(.headline)
-                
+
                 HStack {
                     TextField("Enter tag name...", text: $newTagName)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit {
                             addNewTag()
                         }
-                    
+
                     Button("Add") {
                         addNewTag()
                     }
                     .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                
+
                 // Tag suggestions
                 if !filteredTags.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -341,18 +347,18 @@ struct TagManagementView: View {
                     }
                 }
             }
-            
+
             Spacer()
-            
+
             // Action buttons
             HStack {
                 Button("Cancel") {
                     dismiss()
                 }
                 .buttonStyle(.bordered)
-                
+
                 Spacer()
-                
+
                 Button("Save") {
                     saveTags()
                 }
@@ -369,41 +375,41 @@ struct TagManagementView: View {
             filterAvailableTags(query: newValue)
         }
     }
-    
+
     // MARK: - Tag Operations
     private func addNewTag() {
         let tagName = newTagName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        
+
         guard !tagName.isEmpty,
               !currentTags.contains(where: { $0.name.lowercased() == tagName }) else {
             return
         }
-        
+
         // Create temporary tag for UI
         let tempTag = Tag(id: -1, name: tagName)
         currentTags.append(tempTag)
         newTagName = ""
     }
-    
+
     private func addExistingTag(_ tag: Tag) {
         guard !currentTags.contains(where: { $0.id == tag.id }) else { return }
-        
+
         currentTags.append(tag)
         newTagName = ""
     }
-    
+
     private func removeTag(_ tag: Tag) {
         currentTags.removeAll { $0.id == tag.id }
     }
-    
+
     private func loadTagData() async {
         do {
             // Load current tags for the image
             let imageTags = try await serviceManager.database.getImageTags(imageId: image.id)
-            
+
             // Load all available tags
             let allTags = try await serviceManager.database.getAllTags()
-            
+
             await MainActor.run {
                 self.currentTags = imageTags
                 self.availableTags = allTags.filter { availableTag in
@@ -414,7 +420,7 @@ struct TagManagementView: View {
             print("Error loading tag data: \(error)")
         }
     }
-    
+
     private func filterAvailableTags(query: String) {
         if query.isEmpty {
             filteredTags = Array(availableTags.prefix(10))
@@ -424,29 +430,29 @@ struct TagManagementView: View {
             }
         }
     }
-    
+
     private func saveTags() {
         isLoading = true
-        
+
         Task {
             do {
                 // Remove all existing tags for this image
                 try await serviceManager.database.removeAllImageTags(imageId: image.id)
-                
+
                 // Add all current tags
                 for tag in currentTags {
                     let tagId: Int64
-                    
+
                     if tag.id == -1 {
                         // New tag, create it first
                         tagId = try await serviceManager.database.addTag(name: tag.name)
                     } else {
                         tagId = tag.id
                     }
-                    
+
                     try await serviceManager.database.addImageTag(imageId: image.id, tagId: tagId)
                 }
-                
+
                 await MainActor.run {
                     self.isLoading = false
                     self.dismiss()
@@ -465,19 +471,19 @@ struct TagChipView: View {
     let tag: Tag
     let isRemovable: Bool
     let onRemove: (() -> Void)?
-    
+
     init(tag: Tag, isRemovable: Bool = false, onRemove: (() -> Void)? = nil) {
         self.tag = tag
         self.isRemovable = isRemovable
         self.onRemove = onRemove
     }
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Text(tag.name)
                 .font(.caption)
                 .foregroundColor(.primary)
-            
+
             if isRemovable {
                 Button(action: {
                     onRemove?()
@@ -502,6 +508,7 @@ struct TagChipView: View {
 ```
 
 ### Step 2 Checklist:
+
 - [ ] Create `TagManagementView` with full CRUD operations
 - [ ] Implement tag suggestions and autocomplete
 - [ ] Add visual tag chips with remove functionality
@@ -512,6 +519,7 @@ struct TagChipView: View {
 ## Step 3: Advanced Search Features
 
 ### SearchFiltersView.swift - Filter Panel:
+
 ```swift
 import SwiftUI
 
@@ -521,18 +529,18 @@ struct SearchFiltersView: View {
     @State private var dateRange: DateRange = .all
     @State private var sortOrder: SortOrder = .dateDescending
     @State private var availableTags: [Tag] = []
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Filters")
                 .font(.headline)
-            
+
             // Tag filters
             VStack(alignment: .leading, spacing: 8) {
                 Text("Tags")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                
+
                 LazyVGrid(columns: [
                     GridItem(.adaptive(minimum: 80, maximum: 120), spacing: 8)
                 ], spacing: 8) {
@@ -546,15 +554,15 @@ struct SearchFiltersView: View {
                     }
                 }
             }
-            
+
             Divider()
-            
+
             // Date range filter
             VStack(alignment: .leading, spacing: 8) {
                 Text("Date Added")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                
+
                 Picker("Date Range", selection: $dateRange) {
                     Text("All Time").tag(DateRange.all)
                     Text("Today").tag(DateRange.today)
@@ -564,15 +572,15 @@ struct SearchFiltersView: View {
                 }
                 .pickerStyle(.menu)
             }
-            
+
             Divider()
-            
+
             // Sort order
             VStack(alignment: .leading, spacing: 8) {
                 Text("Sort By")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                
+
                 Picker("Sort Order", selection: $sortOrder) {
                     Text("Date Added (Newest)").tag(SortOrder.dateDescending)
                     Text("Date Added (Oldest)").tag(SortOrder.dateAscending)
@@ -581,9 +589,9 @@ struct SearchFiltersView: View {
                 }
                 .pickerStyle(.menu)
             }
-            
+
             Spacer()
-            
+
             // Reset filters
             Button("Reset Filters") {
                 resetFilters()
@@ -604,7 +612,7 @@ struct SearchFiltersView: View {
             applyFilters()
         }
     }
-    
+
     private func toggleTagSelection(_ tag: Tag) {
         if selectedTags.contains(tag) {
             selectedTags.remove(tag)
@@ -612,13 +620,13 @@ struct SearchFiltersView: View {
             selectedTags.insert(tag)
         }
     }
-    
+
     private func resetFilters() {
         selectedTags.removeAll()
         dateRange = .all
         sortOrder = .dateDescending
     }
-    
+
     private func applyFilters() {
         // Apply filters through search view model
         searchViewModel.applyFilters(
@@ -627,7 +635,7 @@ struct SearchFiltersView: View {
             sortOrder: sortOrder
         )
     }
-    
+
     private func loadAvailableTags() async {
         // Load all available tags from database
     }
@@ -637,7 +645,7 @@ struct TagFilterChip: View {
     let tag: Tag
     let isSelected: Bool
     let onTap: () -> Void
-    
+
     var body: some View {
         Button(action: onTap) {
             Text(tag.name)
@@ -662,6 +670,7 @@ enum SortOrder: CaseIterable {
 ```
 
 ### Step 3 Checklist:
+
 - [ ] Create advanced search filters panel
 - [ ] Implement tag-based filtering
 - [ ] Add date range filtering
@@ -672,17 +681,18 @@ enum SortOrder: CaseIterable {
 ## Step 4: Search Integration
 
 ### Update MainViewModel with enhanced search:
+
 ```swift
 extension MainViewModel {
     func updateSearchResults(_ results: [MemeImage]) {
         images = results
     }
-    
+
     func showTagEditor(for image: MemeImage) {
         selectedImage = image
         showTagEditor = true
     }
-    
+
     func refreshImageTags() {
         // Refresh tags for all images after tag changes
         Task {
@@ -694,7 +704,7 @@ extension MainViewModel {
 // Add to MainView
 struct MainView: View {
     @EnvironmentObject var mainViewModel: MainViewModel
-    
+
     var body: some View {
         // ... existing code ...
         .sheet(isPresented: $mainViewModel.showTagEditor) {
@@ -710,6 +720,7 @@ struct MainView: View {
 ```
 
 ### Step 4 Checklist:
+
 - [ ] Integrate search results with main view
 - [ ] Connect tag editor to main workflow
 - [ ] Update image display after tag changes
@@ -719,15 +730,16 @@ struct MainView: View {
 ## Step 5: Tag Analytics & Management
 
 ### TagAnalyticsView.swift - Tag Overview:
+
 ```swift
 import SwiftUI
 
 struct TagAnalyticsView: View {
     @State private var tagStats: [TagStatistic] = []
     @State private var isLoading = true
-    
+
     @EnvironmentObject var serviceManager: ServiceManager
-    
+
     var body: some View {
         NavigationView {
             VStack(alignment: .leading, spacing: 16) {
@@ -736,15 +748,15 @@ struct TagAnalyticsView: View {
                     Text("Tag Management")
                         .font(.title)
                         .fontWeight(.bold)
-                    
+
                     Spacer()
-                    
+
                     Button("Cleanup Unused Tags") {
                         cleanupUnusedTags()
                     }
                     .buttonStyle(.bordered)
                 }
-                
+
                 // Statistics
                 if isLoading {
                     ProgressView("Loading tag statistics...")
@@ -761,13 +773,13 @@ struct TagAnalyticsView: View {
             }
         }
     }
-    
+
     private func loadTagStatistics() async {
         isLoading = true
-        
+
         do {
             let stats = try await serviceManager.database.getTagStatistics()
-            
+
             await MainActor.run {
                 self.tagStats = stats.sorted { $0.imageCount > $1.imageCount }
                 self.isLoading = false
@@ -779,13 +791,13 @@ struct TagAnalyticsView: View {
             }
         }
     }
-    
+
     private func cleanupUnusedTags() {
         Task {
             do {
                 let removedCount = try await serviceManager.database.removeUnusedTags()
                 await loadTagStatistics()
-                
+
                 await MainActor.run {
                     // Show success message
                     print("Removed \(removedCount) unused tags")
@@ -805,14 +817,14 @@ struct TagStatistic: Identifiable {
 
 struct TagStatisticRow: View {
     let statistic: TagStatistic
-    
+
     var body: some View {
         HStack {
             Text(statistic.name)
                 .font(.body)
-            
+
             Spacer()
-            
+
             Text("\(statistic.imageCount)")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -826,6 +838,7 @@ struct TagStatisticRow: View {
 ```
 
 ### Step 5 Checklist:
+
 - [ ] Create tag analytics and management view
 - [ ] Show tag usage statistics
 - [ ] Add cleanup functionality for unused tags
@@ -835,6 +848,7 @@ struct TagStatisticRow: View {
 ## Step 6: Search Performance Optimization
 
 ### Implement search indexing and caching:
+
 ```swift
 // Add to DatabaseService.swift
 extension DatabaseService {
@@ -845,25 +859,25 @@ extension DatabaseService {
                 filename, original_name, tags, content='images'
             );
         """
-        
+
         try db.execute(createIndexSQL)
     }
-    
+
     func updateSearchIndex(for imageId: Int64) throws {
         // Update search index when image or tags change
         let image = try getImage(id: imageId)
         let tags = try getImageTags(imageId: imageId)
-        
+
         let tagsString = tags.map { $0.name }.joined(separator: " ")
-        
+
         let updateSQL = """
             INSERT OR REPLACE INTO images_fts (rowid, filename, original_name, tags)
             VALUES (?, ?, ?, ?)
         """
-        
+
         try db.execute(updateSQL, [imageId, image?.filename ?? "", image?.originalName ?? "", tagsString])
     }
-    
+
     func performOptimizedSearch(query: String) throws -> [MemeImage] {
         // Use FTS index for better search performance
         let searchSQL = """
@@ -872,7 +886,7 @@ extension DatabaseService {
             WHERE images_fts MATCH ?
             ORDER BY rank
         """
-        
+
         return try db.prepare(searchSQL).bind(query).map { row in
             // Convert row to MemeImage
         }
@@ -881,6 +895,7 @@ extension DatabaseService {
 ```
 
 ### Step 6 Checklist:
+
 - [ ] Implement full-text search indexing
 - [ ] Add search result caching
 - [ ] Optimize database queries for search
@@ -888,6 +903,7 @@ extension DatabaseService {
 - [ ] Add search analytics and metrics
 
 ## Validation Checklist
+
 - [ ] ✅ Real-time search works with proper debouncing
 - [ ] ✅ Tag management system allows full CRUD operations
 - [ ] ✅ Search suggestions and recent searches work
@@ -897,6 +913,7 @@ extension DatabaseService {
 - [ ] ✅ Search and tag data remains consistent across views
 
 ## Common Issues & Solutions
+
 - **Slow search performance**: Implement proper indexing and caching
 - **Tag synchronization issues**: Ensure proper data flow and refresh mechanisms
 - **Memory issues with large tag lists**: Implement proper pagination and lazy loading
@@ -904,7 +921,9 @@ extension DatabaseService {
 - **Tag editor not saving**: Verify database transaction handling
 
 ## Next Steps
+
 Once this phase is complete, proceed to **06-Advanced-Features.md** for implementing keyboard shortcuts, menu integration, and other advanced features.
 
 ---
+
 **Estimated Time**: 2-3 days for complete search and tagging implementation

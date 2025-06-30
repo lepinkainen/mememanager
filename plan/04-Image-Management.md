@@ -1,9 +1,11 @@
 # Phase 4: Image Management & Processing
 
 ## Overview
+
 Implement comprehensive image processing, thumbnail generation, and management features that match the Python implementation's capabilities.
 
 ## Prerequisites
+
 - [ ] Phase 3 (UI Foundation) completed
 - [ ] Image processing service implemented
 - [ ] File management service working
@@ -12,6 +14,7 @@ Implement comprehensive image processing, thumbnail generation, and management f
 ## Step 1: Enhanced Image Processing Service
 
 ### Complete ImageProcessingService.swift:
+
 ```swift
 import AppKit
 import UniformTypeIdentifiers
@@ -21,13 +24,13 @@ class ImageProcessingService: ObservableObject {
     static let thumbnailSize = CGSize(width: 200, height: 200)
     static let maxImageSize = CGSize(width: 2048, height: 2048)
     static let supportedTypes: [UTType] = [.png, .jpeg, .gif, .webp, .bmp]
-    
+
     private let fileManager: FileManagerService
-    
+
     init(fileManager: FileManagerService) {
         self.fileManager = fileManager
     }
-    
+
     // MARK: - Image Processing
     func createThumbnail(from imageURL: URL) async -> NSImage? {
         return await withCheckedContinuation { continuation in
@@ -36,61 +39,61 @@ class ImageProcessingService: ObservableObject {
                     continuation.resume(returning: nil)
                     return
                 }
-                
+
                 let thumbnail = self.resizeImage(image, to: Self.thumbnailSize)
                 continuation.resume(returning: thumbnail)
             }
         }
     }
-    
+
     private func resizeImage(_ image: NSImage, to size: CGSize) -> NSImage {
         let newImage = NSImage(size: size)
         newImage.lockFocus()
         defer { newImage.unlockFocus() }
-        
+
         image.draw(in: NSRect(origin: .zero, size: size),
                    from: NSRect(origin: .zero, size: image.size),
                    operation: .sourceOver,
                    fraction: 1.0)
-        
+
         return newImage
     }
-    
+
     func optimizeImage(_ image: NSImage) -> NSImage {
-        guard image.size.width > Self.maxImageSize.width || 
+        guard image.size.width > Self.maxImageSize.width ||
               image.size.height > Self.maxImageSize.height else {
             return image
         }
-        
+
         return resizeImage(image, to: Self.maxImageSize)
     }
-    
+
     // MARK: - File Validation
     func isSupportedImageType(_ url: URL) -> Bool {
         guard let contentType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType else {
             return false
         }
-        
+
         return Self.supportedTypes.contains { supportedType in
             contentType.conforms(to: supportedType)
         }
     }
-    
+
     func validateImageFile(at url: URL) -> Bool {
         guard url.isFileURL && isSupportedImageType(url) else { return false }
-        
+
         // Try to load the image to verify it's valid
         return NSImage(contentsOf: url) != nil
     }
-    
+
     // MARK: - Image Information
     func getImageInfo(from url: URL) -> ImageInfo? {
         guard let image = NSImage(contentsOf: url) else { return nil }
-        
+
         let resourceValues = try? url.resourceValues(forKeys: [.fileSizeKey, .contentTypeKey])
         let fileSize = resourceValues?.fileSize ?? 0
         let contentType = resourceValues?.contentType ?? UTType.image
-        
+
         return ImageInfo(
             size: image.size,
             fileSize: Int64(fileSize),
@@ -101,6 +104,7 @@ class ImageProcessingService: ObservableObject {
 ```
 
 ### Step 1 Checklist:
+
 - [ ] Complete image processing service with all required methods
 - [ ] Implement proper async thumbnail generation
 - [ ] Add image optimization for large files
@@ -111,17 +115,18 @@ class ImageProcessingService: ObservableObject {
 ## Step 2: Thumbnail Management System
 
 ### ThumbnailCache.swift - Efficient Caching:
+
 ```swift
 import AppKit
 
 actor ThumbnailCache {
     private var cache: [String: NSImage] = [:]
     private let maxCacheSize = 100 // Maximum cached thumbnails
-    
+
     func getThumbnail(for key: String) -> NSImage? {
         return cache[key]
     }
-    
+
     func setThumbnail(_ image: NSImage, for key: String) {
         if cache.count >= maxCacheSize {
             // Remove oldest entries (simple FIFO)
@@ -132,7 +137,7 @@ actor ThumbnailCache {
         }
         cache[key] = image
     }
-    
+
     func clearCache() {
         cache.removeAll()
     }
@@ -142,20 +147,20 @@ class ThumbnailManager: ObservableObject {
     private let cache = ThumbnailCache()
     private let imageProcessor: ImageProcessingService
     private let fileManager: FileManagerService
-    
+
     init(imageProcessor: ImageProcessingService, fileManager: FileManagerService) {
         self.imageProcessor = imageProcessor
         self.fileManager = fileManager
     }
-    
+
     func getThumbnail(for image: MemeImage) async -> NSImage? {
         let cacheKey = image.filename
-        
+
         // Check cache first
         if let cachedThumbnail = await cache.getThumbnail(for: cacheKey) {
             return cachedThumbnail
         }
-        
+
         // Check if thumbnail file exists
         let thumbnailPath = fileManager.getThumbnailPath(for: image.filename)
         if FileManager.default.fileExists(atPath: thumbnailPath.path) {
@@ -164,36 +169,37 @@ class ThumbnailManager: ObservableObject {
                 return thumbnail
             }
         }
-        
+
         // Generate new thumbnail
         guard let imageURL = image.url else { return nil }
-        
+
         if let thumbnail = await imageProcessor.createThumbnail(from: imageURL) {
             // Save thumbnail to disk
             saveThumbnailToDisk(thumbnail, at: thumbnailPath)
-            
+
             // Cache in memory
             await cache.setThumbnail(thumbnail, for: cacheKey)
-            
+
             return thumbnail
         }
-        
+
         return nil
     }
-    
+
     private func saveThumbnailToDisk(_ image: NSImage, at url: URL) {
         guard let tiffData = image.tiffRepresentation,
               let bitmap = NSBitmapImageRep(data: tiffData),
               let jpegData = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) else {
             return
         }
-        
+
         try? jpegData.write(to: url)
     }
 }
 ```
 
 ### Step 2 Checklist:
+
 - [ ] Create `ThumbnailCache` with proper memory management
 - [ ] Implement `ThumbnailManager` with disk caching
 - [ ] Add thumbnail generation and storage
@@ -204,6 +210,7 @@ class ThumbnailManager: ObservableObject {
 ## Step 3: Enhanced Image Grid View
 
 ### Update ImageThumbnailView.swift:
+
 ```swift
 import SwiftUI
 
@@ -213,10 +220,10 @@ struct ImageThumbnailView: View {
     @State private var isLoading = true
     @State private var loadError = false
     @State private var isSelected = false
-    
+
     @EnvironmentObject var serviceManager: ServiceManager
     @EnvironmentObject var mainViewModel: MainViewModel
-    
+
     var body: some View {
         VStack(spacing: 8) {
             // Thumbnail container
@@ -229,7 +236,7 @@ struct ImageThumbnailView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 3)
                     }
-                
+
                 // Content
                 Group {
                     if isLoading {
@@ -253,7 +260,7 @@ struct ImageThumbnailView: View {
                     }
                 }
             }
-            
+
             // Image name
             Text(image.displayName)
                 .font(.caption)
@@ -261,7 +268,7 @@ struct ImageThumbnailView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 160)
                 .foregroundColor(.primary)
-            
+
             // Tags preview
             if !image.tags.isEmpty {
                 TagsPreviewView(tags: Array(image.tags.prefix(2)))
@@ -283,17 +290,17 @@ struct ImageThumbnailView: View {
             isSelected = newValue?.id == image.id
         }
     }
-    
+
     private func selectImage() {
         withAnimation(.easeInOut(duration: 0.2)) {
             mainViewModel.selectedImage = image
         }
     }
-    
+
     private func loadThumbnail() async {
         isLoading = true
         loadError = false
-        
+
         do {
             if let thumbnail = await serviceManager.thumbnailManager.getThumbnail(for: image) {
                 await MainActor.run {
@@ -318,28 +325,28 @@ struct ImageThumbnailView: View {
 struct ImageContextMenu: View {
     let image: MemeImage
     @EnvironmentObject var mainViewModel: MainViewModel
-    
+
     var body: some View {
         Button("Copy to Clipboard") {
             mainViewModel.copyImageToClipboard(image)
         }
-        
+
         Button("Show in Finder") {
             mainViewModel.showImageInFinder(image)
         }
-        
+
         Divider()
-        
+
         Button("Edit Tags...") {
             mainViewModel.showTagEditor(for: image)
         }
-        
+
         Button("Rename...") {
             mainViewModel.showRenameDialog(for: image)
         }
-        
+
         Divider()
-        
+
         Button("Delete", role: .destructive) {
             mainViewModel.deleteImage(image)
         }
@@ -348,6 +355,7 @@ struct ImageContextMenu: View {
 ```
 
 ### Step 3 Checklist:
+
 - [ ] Enhance `ImageThumbnailView` with proper loading states
 - [ ] Add selection highlighting with animations
 - [ ] Implement context menu with image operations
@@ -358,13 +366,14 @@ struct ImageContextMenu: View {
 ## Step 4: Clipboard Integration
 
 ### ClipboardService.swift - System Integration:
+
 ```swift
 import AppKit
 import UniformTypeIdentifiers
 
 class ClipboardService: ObservableObject {
     private let pasteboard = NSPasteboard.general
-    
+
     // MARK: - Reading from Clipboard
     func getImageFromClipboard() -> NSImage? {
         // Try to get image data directly
@@ -372,32 +381,32 @@ class ClipboardService: ObservableObject {
            let image = NSImage(data: imageData) {
             return image
         }
-        
+
         // Try PNG format
         if let imageData = pasteboard.data(forType: .png),
            let image = NSImage(data: imageData) {
             return image
         }
-        
+
         // Try file URL (for copied files)
         if let fileURL = getFileURLFromClipboard(),
            FileManager.default.fileExists(atPath: fileURL.path) {
             return NSImage(contentsOf: fileURL)
         }
-        
+
         return nil
     }
-    
+
     private func getFileURLFromClipboard() -> URL? {
         guard let string = pasteboard.string(forType: .string),
               let url = URL(string: string),
               url.isFileURL else {
             return nil
         }
-        
+
         return url
     }
-    
+
     func hasImageInClipboard() -> Bool {
         return pasteboard.canReadItem(withDataConformingToTypes: [
             NSPasteboard.PasteboardType.png.rawValue,
@@ -405,15 +414,15 @@ class ClipboardService: ObservableObject {
             NSPasteboard.PasteboardType.string.rawValue
         ])
     }
-    
+
     // MARK: - Writing to Clipboard
     func copyImageToClipboard(_ image: NSImage) -> Bool {
         guard let tiffData = image.tiffRepresentation else { return false }
-        
+
         pasteboard.clearContents()
         return pasteboard.setData(tiffData, forType: .tiff)
     }
-    
+
     func copyImageFileToClipboard(from url: URL) -> Bool {
         guard let image = NSImage(contentsOf: url) else { return false }
         return copyImageToClipboard(image)
@@ -422,32 +431,33 @@ class ClipboardService: ObservableObject {
 ```
 
 ### Update MainViewModel with clipboard operations:
+
 ```swift
 extension MainViewModel {
     func pasteFromClipboard() {
         guard let serviceManager = serviceManager else { return }
-        
+
         setLoading(true)
         updateStatus("Checking clipboard...")
-        
+
         Task {
             do {
                 if let image = serviceManager.clipboardService.getImageFromClipboard() {
                     let originalName = "clipboard_image_\(Date().timeIntervalSince1970)"
-                    
+
                     // Save image using file manager service
                     let (filename, path) = try await serviceManager.fileManager.saveImage(
                         image: image,
                         originalName: originalName
                     )
-                    
+
                     // Add to database
                     let imageId = try serviceManager.database.addImage(
                         filename: filename,
                         originalName: originalName,
                         path: path
                     )
-                    
+
                     await MainActor.run {
                         updateStatus("Imported image from clipboard")
                         loadImages()
@@ -462,20 +472,20 @@ extension MainViewModel {
                     updateStatus("Failed to import from clipboard: \(error.localizedDescription)")
                 }
             }
-            
+
             await MainActor.run {
                 setLoading(false)
             }
         }
     }
-    
+
     func copyImageToClipboard(_ image: MemeImage) {
         guard let serviceManager = serviceManager,
               let imageURL = image.url else { return }
-        
+
         Task {
             let success = serviceManager.clipboardService.copyImageFileToClipboard(from: imageURL)
-            
+
             await MainActor.run {
                 if success {
                     updateStatus("Copied \(image.displayName) to clipboard")
@@ -489,6 +499,7 @@ extension MainViewModel {
 ```
 
 ### Step 4 Checklist:
+
 - [ ] Create `ClipboardService` with comprehensive clipboard handling
 - [ ] Implement reading images from clipboard (data + file URLs)
 - [ ] Add writing images to clipboard functionality
@@ -499,47 +510,48 @@ extension MainViewModel {
 ## Step 5: File Import Enhancement
 
 ### Enhanced File Import in MainViewModel:
+
 ```swift
 extension MainViewModel {
     func importImages(from urls: [URL]) {
         guard let serviceManager = serviceManager else { return }
-        
+
         setLoading(true)
         let totalFiles = urls.count
         var importedCount = 0
-        
+
         Task {
             for (index, url) in urls.enumerated() {
                 await MainActor.run {
                     updateStatus("Importing \(index + 1)/\(totalFiles): \(url.lastPathComponent)")
                 }
-                
+
                 do {
                     // Validate image file
                     guard serviceManager.imageProcessor.validateImageFile(at: url) else {
                         continue
                     }
-                    
+
                     // Import the image
                     let (filename, path) = try await serviceManager.fileManager.saveImageFromURL(
                         url,
                         originalName: url.lastPathComponent
                     )
-                    
+
                     // Add to database
                     let imageId = try serviceManager.database.addImage(
                         filename: filename,
                         originalName: url.lastPathComponent,
                         path: path
                     )
-                    
+
                     importedCount += 1
-                    
+
                 } catch {
                     print("Error importing \(url.lastPathComponent): \(error)")
                 }
             }
-            
+
             await MainActor.run {
                 updateStatus("Imported \(importedCount)/\(totalFiles) images")
                 setLoading(false)
@@ -547,7 +559,7 @@ extension MainViewModel {
             }
         }
     }
-    
+
     func showImageInFinder(_ image: MemeImage) {
         guard let url = image.url else { return }
         NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
@@ -556,6 +568,7 @@ extension MainViewModel {
 ```
 
 ### Step 5 Checklist:
+
 - [ ] Enhance file import with proper validation
 - [ ] Add progress tracking for multiple file imports
 - [ ] Implement batch import processing
@@ -566,6 +579,7 @@ extension MainViewModel {
 ## Step 6: Drag & Drop Support
 
 ### Add Drag & Drop to ImageGridView:
+
 ```swift
 extension ImageGridView {
     var body: some View {
@@ -584,35 +598,36 @@ extension ImageGridView {
             handleDrop(providers: providers)
         }
     }
-    
+
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
         var urls: [URL] = []
         let group = DispatchGroup()
-        
+
         for provider in providers {
             group.enter()
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
                 defer { group.leave() }
-                
+
                 if let data = item as? Data,
                    let url = URL(dataRepresentation: data, relativeTo: nil) {
                     urls.append(url)
                 }
             }
         }
-        
+
         group.notify(queue: .main) {
             if !urls.isEmpty {
                 mainViewModel.importImages(from: urls)
             }
         }
-        
+
         return true
     }
 }
 ```
 
 ### Step 6 Checklist:
+
 - [ ] Add drag & drop support to main content area
 - [ ] Implement proper file URL handling
 - [ ] Add visual feedback during drag operations
@@ -623,15 +638,16 @@ extension ImageGridView {
 ## Step 7: Performance Optimization
 
 ### Implement lazy loading and optimization:
+
 ```swift
 // Update ImageGridView for better performance
 struct ImageGridView: View {
     @EnvironmentObject var mainViewModel: MainViewModel
-    
+
     private let columns = [
         GridItem(.adaptive(minimum: 180, maximum: 220), spacing: 10)
     ]
-    
+
     var body: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 10) {
@@ -650,7 +666,7 @@ struct ImageGridView: View {
             handleDrop(providers: providers)
         }
     }
-    
+
     private func preloadNearbyThumbnails(for image: MemeImage) {
         // Implementation for preloading adjacent thumbnails
     }
@@ -658,6 +674,7 @@ struct ImageGridView: View {
 ```
 
 ### Step 7 Checklist:
+
 - [ ] Implement lazy loading for large image collections
 - [ ] Add thumbnail preloading for smooth scrolling
 - [ ] Optimize memory usage with proper caching
@@ -666,6 +683,7 @@ struct ImageGridView: View {
 - [ ] Optimize database queries for image loading
 
 ## Validation Checklist
+
 - [ ] ✅ Thumbnail generation and caching works efficiently
 - [ ] ✅ Image grid displays properly with loading states
 - [ ] ✅ Clipboard import/export functions correctly
@@ -675,6 +693,7 @@ struct ImageGridView: View {
 - [ ] ✅ Performance is acceptable with large image collections
 
 ## Common Issues & Solutions
+
 - **Slow thumbnail loading**: Implement proper background processing and caching
 - **Memory issues**: Use proper image disposal and cache management
 - **File access errors**: Check sandboxing permissions and file URLs
@@ -682,7 +701,9 @@ struct ImageGridView: View {
 - **Context menu issues**: Check view hierarchy and environment objects
 
 ## Next Steps
+
 Once this phase is complete, proceed to **05-Search-Tagging.md** for implementing the search and tagging system.
 
 ---
+
 **Estimated Time**: 3-4 days for complete image management implementation

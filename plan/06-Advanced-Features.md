@@ -1,9 +1,11 @@
 # Phase 6: Advanced Features & Polish
 
 ## Overview
+
 Implement advanced features including keyboard shortcuts, menu integration, preferences, and system-level integrations that make the app feel native to macOS.
 
 ## Prerequisites
+
 - [ ] Phase 5 (Search & Tagging) completed
 - [ ] Core functionality working properly
 - [ ] UI and data layers stable
@@ -12,6 +14,7 @@ Implement advanced features including keyboard shortcuts, menu integration, pref
 ## Step 1: Menu Bar Integration
 
 ### Create MenuCommands.swift:
+
 ```swift
 import SwiftUI
 
@@ -22,57 +25,57 @@ struct ImportCommands: Commands {
                 NotificationCenter.default.post(name: .importFilesRequested, object: nil)
             }
             .keyboardShortcut("o", modifiers: .command)
-            
+
             Button("Paste from Clipboard") {
                 NotificationCenter.default.post(name: .pasteFromClipboardRequested, object: nil)
             }
             .keyboardShortcut("v", modifiers: .command)
-            
+
             Divider()
-            
+
             Button("Import from URL...") {
                 NotificationCenter.default.post(name: .importFromURLRequested, object: nil)
             }
             .keyboardShortcut("u", modifiers: [.command, .shift])
         }
-        
+
         CommandMenu("Edit") {
             Button("Find...") {
                 NotificationCenter.default.post(name: .focusSearchRequested, object: nil)
             }
             .keyboardShortcut("f", modifiers: .command)
-            
+
             Button("Select All") {
                 NotificationCenter.default.post(name: .selectAllRequested, object: nil)
             }
             .keyboardShortcut("a", modifiers: .command)
-            
+
             Divider()
-            
+
             Button("Copy Selected") {
                 NotificationCenter.default.post(name: .copySelectedRequested, object: nil)
             }
             .keyboardShortcut("c", modifiers: .command)
-            
+
             Button("Delete Selected") {
                 NotificationCenter.default.post(name: .deleteSelectedRequested, object: nil)
             }
             .keyboardShortcut(.delete)
         }
-        
+
         CommandMenu("View") {
             Button("Refresh") {
                 NotificationCenter.default.post(name: .refreshRequested, object: nil)
             }
             .keyboardShortcut("r", modifiers: .command)
-            
+
             Button("Show Tag Manager") {
                 NotificationCenter.default.post(name: .showTagManagerRequested, object: nil)
             }
             .keyboardShortcut("t", modifiers: [.command, .shift])
-            
+
             Divider()
-            
+
             Button("Preferences...") {
                 NotificationCenter.default.post(name: .showPreferencesRequested, object: nil)
             }
@@ -97,6 +100,7 @@ extension Notification.Name {
 ```
 
 ### Step 1 Checklist:
+
 - [ ] Create comprehensive menu commands
 - [ ] Add keyboard shortcuts for all major actions
 - [ ] Implement notification-based command handling
@@ -106,6 +110,7 @@ extension Notification.Name {
 ## Step 2: Keyboard Shortcuts & Global Actions
 
 ### KeyboardShortcutHandler.swift:
+
 ```swift
 import SwiftUI
 import Carbon
@@ -113,16 +118,16 @@ import Carbon
 class KeyboardShortcutHandler: ObservableObject {
     private var mainViewModel: MainViewModel?
     private var searchViewModel: SearchViewModel?
-    
+
     init() {
         setupNotificationObservers()
     }
-    
+
     func configure(mainViewModel: MainViewModel, searchViewModel: SearchViewModel) {
         self.mainViewModel = mainViewModel
         self.searchViewModel = searchViewModel
     }
-    
+
     private func setupNotificationObservers() {
         NotificationCenter.default.addObserver(
             forName: .importFilesRequested,
@@ -131,7 +136,7 @@ class KeyboardShortcutHandler: ObservableObject {
         ) { [weak self] _ in
             self?.handleImportFiles()
         }
-        
+
         NotificationCenter.default.addObserver(
             forName: .pasteFromClipboardRequested,
             object: nil,
@@ -139,7 +144,7 @@ class KeyboardShortcutHandler: ObservableObject {
         ) { [weak self] _ in
             self?.handlePasteFromClipboard()
         }
-        
+
         NotificationCenter.default.addObserver(
             forName: .focusSearchRequested,
             object: nil,
@@ -147,7 +152,7 @@ class KeyboardShortcutHandler: ObservableObject {
         ) { [weak self] _ in
             self?.handleFocusSearch()
         }
-        
+
         NotificationCenter.default.addObserver(
             forName: .copySelectedRequested,
             object: nil,
@@ -155,7 +160,7 @@ class KeyboardShortcutHandler: ObservableObject {
         ) { [weak self] _ in
             self?.handleCopySelected()
         }
-        
+
         NotificationCenter.default.addObserver(
             forName: .deleteSelectedRequested,
             object: nil,
@@ -163,7 +168,7 @@ class KeyboardShortcutHandler: ObservableObject {
         ) { [weak self] _ in
             self?.handleDeleteSelected()
         }
-        
+
         NotificationCenter.default.addObserver(
             forName: .refreshRequested,
             object: nil,
@@ -172,31 +177,31 @@ class KeyboardShortcutHandler: ObservableObject {
             self?.handleRefresh()
         }
     }
-    
+
     // MARK: - Action Handlers
     private func handleImportFiles() {
         mainViewModel?.showFileImporter = true
     }
-    
+
     private func handlePasteFromClipboard() {
         mainViewModel?.pasteFromClipboard()
     }
-    
+
     private func handleFocusSearch() {
         // Focus search field - implementation depends on UI structure
         NotificationCenter.default.post(name: .focusSearchField, object: nil)
     }
-    
+
     private func handleCopySelected() {
         guard let selectedImage = mainViewModel?.selectedImage else { return }
         mainViewModel?.copyImageToClipboard(selectedImage)
     }
-    
+
     private func handleDeleteSelected() {
         guard let selectedImage = mainViewModel?.selectedImage else { return }
         mainViewModel?.showDeleteConfirmation(for: selectedImage)
     }
-    
+
     private func handleRefresh() {
         mainViewModel?.loadImages()
     }
@@ -208,17 +213,18 @@ extension Notification.Name {
 ```
 
 ### Enhanced SearchSectionView with focus handling:
+
 ```swift
 struct SearchSectionView: View {
     @StateObject private var searchViewModel = SearchViewModel()
     @EnvironmentObject var mainViewModel: MainViewModel
     @EnvironmentObject var serviceManager: ServiceManager
     @FocusState private var isSearchFocused: Bool
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // ... existing search UI ...
-            
+
             TextField("Search memes...", text: $searchViewModel.searchText)
                 .textFieldStyle(.roundedBorder)
                 .focused($isSearchFocused)
@@ -232,6 +238,7 @@ struct SearchSectionView: View {
 ```
 
 ### Step 2 Checklist:
+
 - [ ] Create keyboard shortcut handler with notification system
 - [ ] Implement all major keyboard shortcuts
 - [ ] Add focus management for search field
@@ -241,13 +248,14 @@ struct SearchSectionView: View {
 ## Step 3: Preferences System
 
 ### PreferencesView.swift - Settings Panel:
+
 ```swift
 import SwiftUI
 
 struct PreferencesView: View {
     @StateObject private var preferences = AppPreferences()
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         TabView {
             GeneralPreferencesView()
@@ -255,19 +263,19 @@ struct PreferencesView: View {
                 .tabItem {
                     Label("General", systemImage: "gear")
                 }
-            
+
             ImportPreferencesView()
                 .environmentObject(preferences)
                 .tabItem {
                     Label("Import", systemImage: "square.and.arrow.down")
                 }
-            
+
             StoragePreferencesView()
                 .environmentObject(preferences)
                 .tabItem {
                     Label("Storage", systemImage: "externaldrive")
                 }
-            
+
             AdvancedPreferencesView()
                 .environmentObject(preferences)
                 .tabItem {
@@ -280,7 +288,7 @@ struct PreferencesView: View {
 
 struct GeneralPreferencesView: View {
     @EnvironmentObject var preferences: AppPreferences
-    
+
     var body: some View {
         Form {
             Section("Appearance") {
@@ -290,21 +298,21 @@ struct GeneralPreferencesView: View {
                     Text("Dark").tag(AppearanceMode.dark)
                 }
                 .pickerStyle(.segmented)
-                
+
                 Toggle("Show thumbnails in grid", isOn: $preferences.showThumbnails)
-                
-                Stepper("Grid columns: \(preferences.gridColumns)", 
-                       value: $preferences.gridColumns, 
+
+                Stepper("Grid columns: \(preferences.gridColumns)",
+                       value: $preferences.gridColumns,
                        in: 2...8)
             }
-            
+
             Section("Search") {
                 Toggle("Real-time search", isOn: $preferences.realtimeSearch)
-                
+
                 Toggle("Search in file names", isOn: $preferences.searchInFilenames)
-                
+
                 Toggle("Search in tags", isOn: $preferences.searchInTags)
-                
+
                 Stepper("Max recent searches: \(preferences.maxRecentSearches)",
                        value: $preferences.maxRecentSearches,
                        in: 5...50)
@@ -317,29 +325,29 @@ struct GeneralPreferencesView: View {
 struct ImportPreferencesView: View {
     @EnvironmentObject var preferences: AppPreferences
     @State private var showingStorageLocationPicker = false
-    
+
     var body: some View {
         Form {
             Section("Import Behavior") {
                 Toggle("Auto-organize by date", isOn: $preferences.autoOrganizeByDate)
-                
+
                 Toggle("Generate thumbnails immediately", isOn: $preferences.generateThumbnailsImmediately)
-                
+
                 Toggle("Optimize large images", isOn: $preferences.optimizeLargeImages)
-                
+
                 Picker("Duplicate handling", selection: $preferences.duplicateHandling) {
                     Text("Ask each time").tag(DuplicateHandling.ask)
                     Text("Skip duplicates").tag(DuplicateHandling.skip)
                     Text("Import anyway").tag(DuplicateHandling.import)
                 }
             }
-            
+
             Section("Default Tags") {
                 VStack(alignment: .leading) {
                     Text("Add these tags to all imported images:")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     TagListEditor(tags: $preferences.defaultTags)
                 }
             }
@@ -351,7 +359,7 @@ struct ImportPreferencesView: View {
 struct StoragePreferencesView: View {
     @EnvironmentObject var preferences: AppPreferences
     @State private var storageInfo: StorageInfo?
-    
+
     var body: some View {
         Form {
             Section("Storage Location") {
@@ -362,16 +370,16 @@ struct StoragePreferencesView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Button("Change Location...") {
                     selectStorageLocation()
                 }
-                
+
                 Button("Reset to Default") {
                     preferences.resetStorageLocation()
                 }
             }
-            
+
             Section("Storage Information") {
                 if let info = storageInfo {
                     HStack {
@@ -379,7 +387,7 @@ struct StoragePreferencesView: View {
                         Spacer()
                         Text("\(info.fileCount)")
                     }
-                    
+
                     HStack {
                         Text("Total size:")
                         Spacer()
@@ -390,16 +398,16 @@ struct StoragePreferencesView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            
+
             Section("Cleanup") {
                 Button("Clean Thumbnails Cache") {
                     cleanThumbnailsCache()
                 }
-                
+
                 Button("Remove Orphaned Files") {
                     removeOrphanedFiles()
                 }
-                
+
                 Button("Rebuild Database Index") {
                     rebuildDatabaseIndex()
                 }
@@ -410,32 +418,32 @@ struct StoragePreferencesView: View {
             await loadStorageInfo()
         }
     }
-    
+
     private func selectStorageLocation() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        
+
         if panel.runModal() == .OK {
             if let url = panel.url {
                 preferences.storageLocation = url
             }
         }
     }
-    
+
     private func loadStorageInfo() async {
         // Load storage information from file manager service
     }
-    
+
     private func cleanThumbnailsCache() {
         // Implement thumbnail cache cleanup
     }
-    
+
     private func removeOrphanedFiles() {
         // Implement orphaned file cleanup
     }
-    
+
     private func rebuildDatabaseIndex() {
         // Implement database index rebuild
     }
@@ -443,6 +451,7 @@ struct StoragePreferencesView: View {
 ```
 
 ### AppPreferences.swift - Settings Management:
+
 ```swift
 import SwiftUI
 import Foundation
@@ -451,57 +460,57 @@ class AppPreferences: ObservableObject {
     @Published var appearance: AppearanceMode {
         didSet { save() }
     }
-    
+
     @Published var showThumbnails: Bool {
         didSet { save() }
     }
-    
+
     @Published var gridColumns: Int {
         didSet { save() }
     }
-    
+
     @Published var realtimeSearch: Bool {
         didSet { save() }
     }
-    
+
     @Published var searchInFilenames: Bool {
         didSet { save() }
     }
-    
+
     @Published var searchInTags: Bool {
         didSet { save() }
     }
-    
+
     @Published var maxRecentSearches: Int {
         didSet { save() }
     }
-    
+
     @Published var autoOrganizeByDate: Bool {
         didSet { save() }
     }
-    
+
     @Published var generateThumbnailsImmediately: Bool {
         didSet { save() }
     }
-    
+
     @Published var optimizeLargeImages: Bool {
         didSet { save() }
     }
-    
+
     @Published var duplicateHandling: DuplicateHandling {
         didSet { save() }
     }
-    
+
     @Published var defaultTags: [String] {
         didSet { save() }
     }
-    
+
     @Published var storageLocation: URL {
         didSet { save() }
     }
-    
+
     private let userDefaults = UserDefaults.standard
-    
+
     init() {
         self.appearance = AppearanceMode(rawValue: userDefaults.string(forKey: "appearance") ?? "system") ?? .system
         self.showThumbnails = userDefaults.bool(forKey: "showThumbnails")
@@ -515,7 +524,7 @@ class AppPreferences: ObservableObject {
         self.optimizeLargeImages = userDefaults.bool(forKey: "optimizeLargeImages")
         self.duplicateHandling = DuplicateHandling(rawValue: userDefaults.string(forKey: "duplicateHandling") ?? "ask") ?? .ask
         self.defaultTags = userDefaults.stringArray(forKey: "defaultTags") ?? []
-        
+
         // Storage location
         if let data = userDefaults.data(forKey: "storageLocation"),
            let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as URL? {
@@ -525,7 +534,7 @@ class AppPreferences: ObservableObject {
                 .appendingPathComponent("MemeManager")
         }
     }
-    
+
     private func save() {
         userDefaults.set(appearance.rawValue, forKey: "appearance")
         userDefaults.set(showThumbnails, forKey: "showThumbnails")
@@ -539,13 +548,13 @@ class AppPreferences: ObservableObject {
         userDefaults.set(optimizeLargeImages, forKey: "optimizeLargeImages")
         userDefaults.set(duplicateHandling.rawValue, forKey: "duplicateHandling")
         userDefaults.set(defaultTags, forKey: "defaultTags")
-        
+
         // Save storage location
         if let data = try? NSKeyedArchiver.archivedData(withRootObject: storageLocation, requiringSecureCoding: true) {
             userDefaults.set(data, forKey: "storageLocation")
         }
     }
-    
+
     func resetStorageLocation() {
         storageLocation = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
             .appendingPathComponent("MemeManager")
@@ -566,6 +575,7 @@ enum DuplicateHandling: String, CaseIterable {
 ```
 
 ### Step 3 Checklist:
+
 - [ ] Create comprehensive preferences system
 - [ ] Implement tabbed preferences interface
 - [ ] Add all major app settings and configurations
@@ -575,55 +585,56 @@ enum DuplicateHandling: String, CaseIterable {
 ## Step 4: System Integration Features
 
 ### SystemIntegrationService.swift:
+
 ```swift
 import AppKit
 import UniformTypeIdentifiers
 
 class SystemIntegrationService: ObservableObject {
-    
+
     // MARK: - Finder Integration
     func revealInFinder(_ url: URL) {
         NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
     }
-    
+
     func openWithDefaultApp(_ url: URL) {
         NSWorkspace.shared.open(url)
     }
-    
+
     // MARK: - Sharing
     func shareImages(_ images: [MemeImage]) {
         let urls = images.compactMap { $0.url }
         guard !urls.isEmpty else { return }
-        
+
         let sharingService = NSSharingServicePicker(items: urls)
-        
+
         // Show sharing picker
         if let window = NSApp.mainWindow {
             let rect = NSRect(x: window.frame.midX, y: window.frame.midY, width: 1, height: 1)
             sharingService.show(relativeTo: rect, of: window.contentView!, preferredEdge: .minY)
         }
     }
-    
+
     // MARK: - Quick Look
     func quickLookImages(_ images: [MemeImage], startingAt index: Int = 0) {
         let urls = images.compactMap { $0.url }
         guard !urls.isEmpty else { return }
-        
+
         // Use QLPreviewPanel for Quick Look
         let panel = QLPreviewPanel.shared()
         panel?.makeKeyAndOrderFront(nil)
     }
-    
+
     // MARK: - Spotlight Integration
     func updateSpotlightMetadata(for image: MemeImage) {
         guard let url = image.url else { return }
-        
+
         let item = NSMetadataItem()
         // Set searchable attributes
         item.setValue(image.displayName, forKey: NSMetadataItemDisplayNameKey)
         item.setValue(image.tags.map { $0.name }.joined(separator: ", "), forKey: NSMetadataItemKeywordsKey)
         item.setValue("Meme Manager", forKey: NSMetadataItemCreatorKey)
-        
+
         // Update metadata
         do {
             try url.setResourceValue(item, forKey: .customKeysKey)
@@ -631,11 +642,11 @@ class SystemIntegrationService: ObservableObject {
             print("Failed to update Spotlight metadata: \(error)")
         }
     }
-    
+
     // MARK: - Services Menu Integration
     func registerServices() {
         NSUpdateDynamicServices()
-        
+
         // Register for image services
         let serviceProvider = ImageServiceProvider()
         NSApplication.shared.servicesProvider = serviceProvider
@@ -643,13 +654,13 @@ class SystemIntegrationService: ObservableObject {
 }
 
 class ImageServiceProvider: NSObject {
-    @objc func importImageFromService(_ pasteboard: NSPasteboard, 
-                                    userData: String, 
+    @objc func importImageFromService(_ pasteboard: NSPasteboard,
+                                    userData: String,
                                     error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         // Handle service requests to import images
         if let imageData = pasteboard.data(forType: .tiff),
            let image = NSImage(data: imageData) {
-            
+
             // Import the image through notification
             NotificationCenter.default.post(
                 name: .importImageFromService,
@@ -665,6 +676,7 @@ extension Notification.Name {
 ```
 
 ### Step 4 Checklist:
+
 - [ ] Create system integration service
 - [ ] Add Finder integration (reveal, open with)
 - [ ] Implement sharing service integration
@@ -675,6 +687,7 @@ extension Notification.Name {
 ## Step 5: Advanced UI Features
 
 ### ImageDetailView.swift - Full Image Viewer:
+
 ```swift
 import SwiftUI
 
@@ -685,10 +698,10 @@ struct ImageDetailView: View {
     @State private var showingTagEditor = false
     @State private var showingRenameDialog = false
     @State private var zoomLevel: CGFloat = 1.0
-    
+
     @EnvironmentObject var serviceManager: ServiceManager
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationView {
             GeometryReader { geometry in
@@ -717,7 +730,7 @@ struct ImageDetailView: View {
                         }
                         .frame(maxWidth: geometry.size.width * 0.8,
                                maxHeight: geometry.size.height * 0.7)
-                        
+
                         // Image information
                         ImageInfoPanel(image: image)
                     }
@@ -731,15 +744,15 @@ struct ImageDetailView: View {
                 Button("Edit Tags") {
                     showingTagEditor = true
                 }
-                
+
                 Button("Rename") {
                     showingRenameDialog = true
                 }
-                
+
                 Button("Copy") {
                     copyImageToClipboard()
                 }
-                
+
                 Button("Share") {
                     shareImage()
                 }
@@ -755,12 +768,12 @@ struct ImageDetailView: View {
             RenameImageView(image: image)
         }
     }
-    
+
     private func loadFullImage() async {
         guard let url = image.url else { return }
-        
+
         isLoading = true
-        
+
         if let image = NSImage(contentsOf: url) {
             await MainActor.run {
                 self.fullImage = image
@@ -772,18 +785,18 @@ struct ImageDetailView: View {
             }
         }
     }
-    
+
     private func copyImageToClipboard() {
         guard let fullImage = fullImage else { return }
-        
+
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.writeObjects([fullImage])
     }
-    
+
     private func shareImage() {
         guard let url = image.url else { return }
-        
+
         serviceManager.systemIntegration.shareImages([image])
     }
 }
@@ -791,51 +804,51 @@ struct ImageDetailView: View {
 struct ImageInfoPanel: View {
     let image: MemeImage
     @State private var imageInfo: ImageInfo?
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Image Information")
                 .font(.headline)
-            
+
             Grid(alignment: .leading) {
                 GridRow {
                     Text("Name:")
                         .fontWeight(.medium)
                     Text(image.displayName)
                 }
-                
+
                 GridRow {
                     Text("Filename:")
                         .fontWeight(.medium)
                     Text(image.filename)
                 }
-                
+
                 if let info = imageInfo {
                     GridRow {
                         Text("Size:")
                             .fontWeight(.medium)
                         Text("\(Int(info.size.width)) × \(Int(info.size.height))")
                     }
-                    
+
                     GridRow {
                         Text("File Size:")
                             .fontWeight(.medium)
                         Text(ByteCountFormatter.string(fromByteCount: info.fileSize, countStyle: .file))
                     }
-                    
+
                     GridRow {
                         Text("Type:")
                             .fontWeight(.medium)
                         Text(info.type.preferredFilenameExtension?.uppercased() ?? "Unknown")
                     }
                 }
-                
+
                 GridRow {
                     Text("Created:")
                         .fontWeight(.medium)
                     Text(image.createdDate, format: .dateTime)
                 }
-                
+
                 if !image.tags.isEmpty {
                     GridRow {
                         Text("Tags:")
@@ -852,7 +865,7 @@ struct ImageInfoPanel: View {
             await loadImageInfo()
         }
     }
-    
+
     private func loadImageInfo() async {
         // Load image information
     }
@@ -860,6 +873,7 @@ struct ImageInfoPanel: View {
 ```
 
 ### Step 5 Checklist:
+
 - [ ] Create full-screen image detail view
 - [ ] Add zoom and pan functionality
 - [ ] Implement image information panel
@@ -869,6 +883,7 @@ struct ImageInfoPanel: View {
 ## Step 6: Export & Backup Features
 
 ### ExportService.swift:
+
 ```swift
 import Foundation
 import AppKit
@@ -876,12 +891,12 @@ import AppKit
 class ExportService: ObservableObject {
     private let databaseService: DatabaseService
     private let fileManager: FileManagerService
-    
+
     init(databaseService: DatabaseService, fileManager: FileManagerService) {
         self.databaseService = databaseService
         self.fileManager = fileManager
     }
-    
+
     // MARK: - Export Options
     func exportImageCollection(images: [MemeImage], to destinationURL: URL, format: ExportFormat) async throws {
         switch format {
@@ -893,30 +908,30 @@ class ExportService: ObservableObject {
             try await exportToJSON(images: images, destination: destinationURL)
         }
     }
-    
+
     private func exportToFolder(images: [MemeImage], destination: URL) async throws {
         // Create destination directory
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-        
+
         // Export metadata
         let metadata = ExportMetadata(images: images, exportDate: Date())
         let metadataData = try JSONEncoder().encode(metadata)
         try metadataData.write(to: destination.appendingPathComponent("metadata.json"))
-        
+
         // Copy image files
         for image in images {
             guard let sourceURL = image.url else { continue }
-            
+
             let destinationImageURL = destination.appendingPathComponent(image.filename)
             try FileManager.default.copyItem(at: sourceURL, to: destinationImageURL)
         }
     }
-    
+
     private func exportToArchive(images: [MemeImage], destination: URL) async throws {
         // Create ZIP archive with images and metadata
         // Implementation would use a ZIP library
     }
-    
+
     private func exportToJSON(images: [MemeImage], destination: URL) async throws {
         let exportData = ExportData(
             version: "1.0",
@@ -930,26 +945,26 @@ class ExportService: ObservableObject {
                 )
             }
         )
-        
+
         let jsonData = try JSONEncoder().encode(exportData)
         try jsonData.write(to: destination)
     }
-    
+
     // MARK: - Backup
     func createBackup(to destinationURL: URL) async throws {
         // Create complete backup including database and images
         let backupFolder = destinationURL.appendingPathComponent("MemeManager_Backup_\(Date().timeIntervalSince1970)")
         try FileManager.default.createDirectory(at: backupFolder, withIntermediateDirectories: true)
-        
+
         // Copy database
         let databaseURL = databaseService.databaseURL
         let backupDatabaseURL = backupFolder.appendingPathComponent("database.db")
         try FileManager.default.copyItem(at: databaseURL, to: backupDatabaseURL)
-        
+
         // Copy all images
         let imagesBackupURL = backupFolder.appendingPathComponent("images")
         try FileManager.default.copyItem(at: fileManager.storageDirectory, to: imagesBackupURL)
-        
+
         // Create backup manifest
         let manifest = BackupManifest(
             version: "1.0",
@@ -957,7 +972,7 @@ class ExportService: ObservableObject {
             imageCount: try databaseService.getImageCount(),
             tagCount: try databaseService.getTagCount()
         )
-        
+
         let manifestData = try JSONEncoder().encode(manifest)
         try manifestData.write(to: backupFolder.appendingPathComponent("manifest.json"))
     }
@@ -997,6 +1012,7 @@ enum ExportFormat: String, CaseIterable {
 ```
 
 ### Step 6 Checklist:
+
 - [ ] Create export service with multiple formats
 - [ ] Implement backup functionality
 - [ ] Add export UI with format selection
@@ -1004,6 +1020,7 @@ enum ExportFormat: String, CaseIterable {
 - [ ] Add progress tracking for long operations
 
 ## Validation Checklist
+
 - [ ] ✅ Menu bar integration works with all commands
 - [ ] ✅ Keyboard shortcuts function properly throughout app
 - [ ] ✅ Preferences system saves and applies settings
@@ -1013,6 +1030,7 @@ enum ExportFormat: String, CaseIterable {
 - [ ] ✅ App feels native to macOS with proper conventions
 
 ## Common Issues & Solutions
+
 - **Menu commands not working**: Check notification observers and command setup
 - **Keyboard shortcuts conflicting**: Verify shortcut assignments and system conflicts
 - **Preferences not persisting**: Check UserDefaults implementation and save timing
@@ -1020,7 +1038,9 @@ enum ExportFormat: String, CaseIterable {
 - **Export errors**: Check file permissions and error handling
 
 ## Next Steps
+
 Once this phase is complete, proceed to **07-Testing-Polish.md** for comprehensive testing and final polish.
 
 ---
+
 **Estimated Time**: 3-4 days for complete advanced features implementation
