@@ -237,6 +237,10 @@ class MemeManagerViewModel: ObservableObject {
         selectedTags.removeAll()
     }
     
+    func clearSelectedImage() {
+        selectedImage = nil
+    }
+    
     func renameImage(_ image: MemeImage, newName: String) {
         guard let imageId = image.databaseId else { 
             showError("Cannot rename image: Invalid image ID")

@@ -16,10 +16,7 @@ struct ImageGridView: View {
             }
             .padding()
         }
-        .sheet(item: Binding<MemeImage?>(
-            get: { viewModel.selectedImage },
-            set: { viewModel.selectedImage = $0 }
-        )) { image in
+        .sheet(item: $viewModel.selectedImage) { image in
             ImageDetailView(image: image)
                 .environmentObject(viewModel)
         }

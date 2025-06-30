@@ -10,8 +10,31 @@ struct ImageDetailView: View {
     @State private var showingDeleteConfirmation = false
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 16) {
+        VStack(spacing: 0) {
+            // Custom header
+            HStack {
+                Text("Image Details")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button(action: { 
+                    viewModel.clearSelectedImage()
+                    dismiss() 
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Close")
+            }
+            .padding()
+            .background(Color(NSColor.controlBackgroundColor))
+            
+            Divider()
+            
+            ScrollView {
+                VStack(spacing: 16) {
                 // Image preview
                 AsyncImage(url: URL(fileURLWithPath: image.path)) { phase in
                     switch phase {
@@ -90,7 +113,6 @@ struct ImageDetailView: View {
                                 ForEach(image.tags, id: \.id) { tag in
                                     TagChip(tag: tag) {
                                         viewModel.removeTagFromImage(image, tag: tag)
-                                        dismiss()
                                     }
                                 }
                             }
@@ -107,7 +129,6 @@ struct ImageDetailView: View {
                 HStack(spacing: 16) {
                     Button("Copy to Clipboard") {
                         viewModel.copyImageToClipboard(image)
-                        dismiss()
                     }
                     .buttonStyle(.bordered)
                     .help("Copy image to clipboard for sharing")
@@ -118,15 +139,8 @@ struct ImageDetailView: View {
                     .buttonStyle(.bordered)
                     .help("Delete this image permanently")
                 }
-            }
-            .padding()
-            .navigationTitle("Image Details")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
                 }
+                .padding()
             }
         }
         .alert("Add Tags", isPresented: $showingTagInput) {
@@ -136,13 +150,13 @@ struct ImageDetailView: View {
                 let tagNames = newTagText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 viewModel.addTagsToImage(image, tagNames: tagNames)
                 newTagText = ""
-                dismiss()
             }
         }
         .alert("Delete Image", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
                 viewModel.deleteImage(image)
+                viewModel.clearSelectedImage()
                 dismiss()
             }
         } message: {
