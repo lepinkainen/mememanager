@@ -1,7 +1,7 @@
 import Foundation
 
 struct MemeImage: Identifiable, Codable {
-    let id: Int
+    let id: Int?
     let filename: String
     let originalName: String
     let path: String
