@@ -76,4 +76,41 @@ class FileManagerService {
             return nil
         }
     }
+    
+    func getThumbnailPath(for filename: String) -> URL {
+        let now = Date()
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: now)
+        let month = calendar.component(.month, from: now)
+        
+        let thumbnailDirectory = getThumbnailURL(for: year, month: month)
+        let thumbnailFilename = (filename as NSString).deletingPathExtension + "_thumb.jpg"
+        
+        return thumbnailDirectory.appendingPathComponent(thumbnailFilename)
+    }
+    
+    func saveImageFromData(_ data: Data, originalName: String) -> String? {
+        let now = Date()
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: now)
+        let month = calendar.component(.month, from: now)
+        
+        let storageURL = getStorageURL(for: year, month: month)
+        
+        // Create directory if needed
+        if !fileManager.fileExists(atPath: storageURL.path) {
+            try? fileManager.createDirectory(at: storageURL, withIntermediateDirectories: true)
+        }
+        
+        let filename = generateUniqueFilename(originalName: originalName)
+        let destinationURL = storageURL.appendingPathComponent(filename)
+        
+        do {
+            try data.write(to: destinationURL)
+            return destinationURL.path
+        } catch {
+            print("Error saving image from data: \(error)")
+            return nil
+        }
+    }
 }

@@ -20,7 +20,12 @@ class MemeManagerViewModel: ObservableObject {
     
     private let databaseService = DatabaseService.shared
     private let fileManagerService = FileManagerService.shared
-    private let imageProcessingService = ImageProcessingService.shared
+    let imageProcessingService = ImageProcessingService.shared
+    private let clipboardService = ClipboardService()
+    private lazy var thumbnailManager = ThumbnailManager(
+        imageProcessor: imageProcessingService,
+        fileManager: fileManagerService
+    )
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -128,20 +133,33 @@ class MemeManagerViewModel: ObservableObject {
     }
     
     func importFromClipboard() {
-        guard let image = NSPasteboard.general.readObjects(forClasses: [NSImage.self], options: nil)?.first as? NSImage else {
+        guard let image = clipboardService.getImageFromClipboard() else {
             showError("No image found in clipboard")
             return
         }
         
         isLoading = true
+        updateStatus("Importing image from clipboard...")
         
         Task {
             if let tempURL = await saveImageToTemp(image: image) {
                 await importSingleImage(from: tempURL)
                 try? FileManager.default.removeItem(at: tempURL)
-                loadInitialData()
+                await MainActor.run {
+                    showSuccess("Image imported from clipboard")
+                    loadInitialData()
+                }
+            } else {
+                await MainActor.run {
+                    showError("Failed to process clipboard image")
+                    isLoading = false
+                }
             }
         }
+    }
+    
+    func hasClipboardImage() -> Bool {
+        return clipboardService.hasImageInClipboard()
     }
     
     private func saveImageToTemp(image: NSImage) async -> URL? {
@@ -165,14 +183,17 @@ class MemeManagerViewModel: ObservableObject {
     }
     
     func copyImageToClipboard(_ image: MemeImage) {
-        guard let nsImage = NSImage(contentsOfFile: image.path) else { 
-            showError("Failed to load image for copying")
-            return 
+        Task {
+            let success = clipboardService.copyImageFileToClipboard(from: URL(fileURLWithPath: image.path))
+            
+            await MainActor.run {
+                if success {
+                    showSuccess("Image copied to clipboard")
+                } else {
+                    showError("Failed to copy image to clipboard")
+                }
+            }
         }
-        
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.writeObjects([nsImage])
-        showSuccess("Image copied to clipboard")
     }
     
     func deleteImage(_ image: MemeImage) {
@@ -260,7 +281,7 @@ class MemeManagerViewModel: ObservableObject {
         }
     }
     
-    private func showError(_ message: String) {
+    func showError(_ message: String) {
         errorMessage = message
         showingError = true
     }
@@ -268,5 +289,16 @@ class MemeManagerViewModel: ObservableObject {
     private func showSuccess(_ message: String) {
         successMessage = message
         showingSuccess = true
+    }
+    
+    private func updateStatus(_ message: String) {
+        // For now, we'll use success messages for status updates
+        // In a future version, we could add a dedicated status system
+        showSuccess(message)
+    }
+    
+    func showImageInFinder(_ image: MemeImage) {
+        let url = URL(fileURLWithPath: image.path)
+        NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
     }
 }

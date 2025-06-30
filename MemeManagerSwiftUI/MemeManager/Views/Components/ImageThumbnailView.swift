@@ -72,9 +72,19 @@ struct ImageThumbnailView: View {
                 viewModel.copyImageToClipboard(image)
             }
             
+            Button("Show in Finder") {
+                viewModel.showImageInFinder(image)
+            }
+            
+            Divider()
+            
             Button("Rename") {
                 newName = image.originalName
                 showingRenameAlert = true
+            }
+            
+            Button("Edit Tags...") {
+                viewModel.selectedImage = image
             }
             
             Divider()
