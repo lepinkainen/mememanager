@@ -93,3 +93,6 @@ mememanager/
 
 ## Current Status
 Project is in initial development phase. Core MVP features are being implemented first, with LLM integration planned for a later iteration.
+
+## Personal Development Notes
+- When working from a markdown checklist ALWAYS check off the tasks when they're done

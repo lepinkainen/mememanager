@@ -5,8 +5,7 @@ struct ImageDetailView: View {
     @EnvironmentObject var viewModel: MemeManagerViewModel
     @Environment(\.dismiss) private var dismiss
     
-    @State private var newTagText = ""
-    @State private var showingTagInput = false
+    @State private var showingTagEditor = false
     @State private var showingDeleteConfirmation = false
     
     var body: some View {
@@ -97,7 +96,7 @@ struct ImageDetailView: View {
                             Text("Tags")
                                 .font(.headline)
                             Spacer()
-                            Button(action: { showingTagInput = true }) {
+                            Button(action: { showingTagEditor = true }) {
                                 Image(systemName: "plus.circle.fill")
                                     .foregroundColor(.blue)
                             }
@@ -145,14 +144,9 @@ struct ImageDetailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
-        .alert("Add Tags", isPresented: $showingTagInput) {
-            TextField("Enter tags (comma separated)", text: $newTagText)
-            Button("Cancel", role: .cancel) { }
-            Button("Add") {
-                let tagNames = newTagText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                viewModel.addTagsToImage(image, tagNames: tagNames)
-                newTagText = ""
-            }
+        .sheet(isPresented: $showingTagEditor) {
+            TagEditorSheet(image: image)
+                .environmentObject(viewModel)
         }
         .alert("Delete Image", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
