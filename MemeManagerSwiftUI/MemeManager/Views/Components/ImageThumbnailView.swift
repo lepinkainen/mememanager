@@ -4,6 +4,7 @@ struct ImageThumbnailView: View {
     let image: MemeImage
     @EnvironmentObject var viewModel: MemeManagerViewModel
     @State private var showingRenameAlert = false
+    @State private var showingDeleteConfirmation = false
     @State private var newName = ""
     
     var body: some View {
@@ -79,15 +80,23 @@ struct ImageThumbnailView: View {
             Divider()
             
             Button("Delete", role: .destructive) {
-                viewModel.deleteImage(image)
+                showingDeleteConfirmation = true
             }
         }
         .alert("Rename Image", isPresented: $showingRenameAlert) {
             TextField("New name", text: $newName)
             Button("Cancel", role: .cancel) { }
             Button("Rename") {
-                // TODO: Implement rename functionality
+                viewModel.renameImage(image, newName: newName.trimmingCharacters(in: .whitespacesAndNewlines))
             }
+        }
+        .alert("Delete Image", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                viewModel.deleteImage(image)
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(image.originalName)\"? This action cannot be undone.")
         }
     }
 }

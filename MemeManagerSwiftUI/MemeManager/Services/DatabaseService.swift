@@ -248,6 +248,20 @@ class DatabaseService: ObservableObject {
         return nil
     }
     
+    func updateImageName(id: Int, newName: String) -> Bool {
+        guard let db = db else { return false }
+        
+        do {
+            let imageToUpdate = images.filter(imageId == id)
+            let update = imageToUpdate.update(imageOriginalName <- newName, imageUpdatedDate <- Date())
+            let changes = try db.run(update)
+            return changes > 0
+        } catch {
+            print("Failed to update image name: \(error)")
+            return false
+        }
+    }
+    
     func getTagsForImage(imageId: Int) -> [Tag] {
         guard let db = db else { return [] }
         

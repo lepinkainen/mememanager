@@ -4,44 +4,54 @@ struct SidebarView: View {
     @EnvironmentObject var viewModel: MemeManagerViewModel
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             // Import Section
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text("Import")
                     .font(.headline)
-                    .foregroundColor(.secondary)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
                 
-                Button(action: {
-                    let panel = NSOpenPanel()
-                    panel.allowedContentTypes = [.image]
-                    panel.allowsMultipleSelection = true
-                    panel.canChooseDirectories = false
-                    panel.canChooseFiles = true
-                    
-                    if panel.runModal() == .OK {
-                        viewModel.importImages(from: panel.urls)
+                VStack(spacing: 8) {
+                    Button(action: {
+                        let panel = NSOpenPanel()
+                        panel.allowedContentTypes = [.image]
+                        panel.allowsMultipleSelection = true
+                        panel.canChooseDirectories = false
+                        panel.canChooseFiles = true
+                        
+                        if panel.runModal() == .OK {
+                            viewModel.importImages(from: panel.urls)
+                        }
+                    }) {
+                        Label("Import Images", systemImage: "plus.circle")
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                }) {
-                    Label("Import Images", systemImage: "plus.circle")
+                    .buttonStyle(.borderless)
+                    .controlSize(.large)
+                    .help("Select images from your computer to import")
+                    
+                    Button(action: {
+                        viewModel.importFromClipboard()
+                    }) {
+                        Label("From Clipboard", systemImage: "doc.on.clipboard")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.large)
+                    .help("Import image from clipboard (⌘⇧V)")
                 }
-                .buttonStyle(.plain)
-                
-                Button(action: {
-                    viewModel.importFromClipboard()
-                }) {
-                    Label("From Clipboard", systemImage: "doc.on.clipboard")
-                }
-                .buttonStyle(.plain)
             }
             
             Divider()
             
             // Search Section
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text("Search")
                         .font(.headline)
-                        .foregroundColor(.secondary)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
                     
                     Spacer()
                     
@@ -51,6 +61,8 @@ struct SidebarView: View {
                         }
                         .font(.caption)
                         .foregroundColor(.blue)
+                        .buttonStyle(.borderless)
+                        .help("Clear all search filters (ESC)")
                     }
                 }
                 
@@ -58,14 +70,15 @@ struct SidebarView: View {
                 
                 // Tag filters
                 if !viewModel.allTags.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("Filter by Tags")
                             .font(.subheadline)
+                            .fontWeight(.medium)
                             .foregroundColor(.secondary)
                         
                         LazyVGrid(columns: [
-                            GridItem(.adaptive(minimum: 60), spacing: 4)
-                        ], spacing: 4) {
+                            GridItem(.adaptive(minimum: 70), spacing: 6)
+                        ], spacing: 6) {
                             ForEach(viewModel.allTags, id: \.id) { tag in
                                 FilterTagChip(
                                     tag: tag,
@@ -83,14 +96,29 @@ struct SidebarView: View {
             
             // Stats
             if !viewModel.images.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 8) {
                     Divider()
-                    Text("\(viewModel.images.count) memes")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("\(viewModel.allTags.count) tags")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(viewModel.images.count)")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                            Text("memes")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(viewModel.allTags.count)")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                            Text("tags")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
             }
         }
@@ -105,6 +133,7 @@ struct SearchBar: View {
     var body: some View {
         TextField("Search memes...", text: $viewModel.searchText)
             .textFieldStyle(.roundedBorder)
+            .help("Search by image name or content")
     }
 }
 
@@ -117,12 +146,17 @@ struct FilterTagChip: View {
         Button(action: onTap) {
             Text(tag.name)
                 .font(.caption)
+                .fontWeight(.medium)
                 .lineLimit(1)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(isSelected ? Color.blue : Color.gray.opacity(0.3))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.blue : Color.gray.opacity(0.2))
                 .foregroundColor(isSelected ? .white : .primary)
-                .cornerRadius(8)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isSelected ? Color.blue : Color.gray.opacity(0.4), lineWidth: 0.5)
+                )
         }
         .buttonStyle(.plain)
     }

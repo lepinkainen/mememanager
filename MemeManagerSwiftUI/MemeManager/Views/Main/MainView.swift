@@ -6,8 +6,20 @@ struct MainView: View {
     var body: some View {
         VStack {
             if viewModel.isLoading {
-                ProgressView("Loading...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 16) {
+                    if viewModel.totalImportCount > 0 {
+                        ProgressView("Importing images...", value: viewModel.importProgress, total: 1.0)
+                            .progressViewStyle(LinearProgressViewStyle())
+                            .frame(width: 300)
+                        
+                        Text("\(viewModel.importingCount) of \(viewModel.totalImportCount) images imported")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        ProgressView("Loading...")
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.images.isEmpty {
                 EmptyStateView()
             } else {

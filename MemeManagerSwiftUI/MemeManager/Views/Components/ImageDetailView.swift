@@ -7,6 +7,7 @@ struct ImageDetailView: View {
     
     @State private var newTagText = ""
     @State private var showingTagInput = false
+    @State private var showingDeleteConfirmation = false
     
     var body: some View {
         NavigationView {
@@ -75,6 +76,7 @@ struct ImageDetailView: View {
                                 Image(systemName: "plus.circle.fill")
                                     .foregroundColor(.blue)
                             }
+                            .help("Add tags to organize this image")
                         }
                         
                         if image.tags.isEmpty {
@@ -108,12 +110,13 @@ struct ImageDetailView: View {
                         dismiss()
                     }
                     .buttonStyle(.bordered)
+                    .help("Copy image to clipboard for sharing")
                     
                     Button("Delete", role: .destructive) {
-                        viewModel.deleteImage(image)
-                        dismiss()
+                        showingDeleteConfirmation = true
                     }
                     .buttonStyle(.bordered)
+                    .help("Delete this image permanently")
                 }
             }
             .padding()
@@ -136,6 +139,15 @@ struct ImageDetailView: View {
                 dismiss()
             }
         }
+        .alert("Delete Image", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                viewModel.deleteImage(image)
+                dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(image.originalName)\"? This action cannot be undone.")
+        }
         .frame(minWidth: 500, minHeight: 600)
     }
 }
@@ -145,9 +157,10 @@ struct TagChip: View {
     let onRemove: () -> Void
     
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Text(tag.name)
                 .font(.caption)
+                .fontWeight(.medium)
                 .lineLimit(1)
             
             Button(action: onRemove) {
@@ -157,10 +170,14 @@ struct TagChip: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.blue.opacity(0.2))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.blue.opacity(0.15))
         .foregroundColor(.blue)
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.blue.opacity(0.3), lineWidth: 0.5)
+        )
     }
 }

@@ -10,6 +10,13 @@ class MemeManagerViewModel: ObservableObject {
     @Published var allTags: [Tag] = []
     @Published var isLoading: Bool = false
     @Published var selectedImage: MemeImage?
+    @Published var errorMessage: String?
+    @Published var showingError: Bool = false
+    @Published var successMessage: String?
+    @Published var showingSuccess: Bool = false
+    @Published var importProgress: Double = 0.0
+    @Published var importingCount: Int = 0
+    @Published var totalImportCount: Int = 0
     
     private let databaseService = DatabaseService.shared
     private let fileManagerService = FileManagerService.shared
@@ -55,13 +62,44 @@ class MemeManagerViewModel: ObservableObject {
     }
     
     func importImages(from urls: [URL]) {
+        // Filter valid image URLs
+        let validUrls = urls.filter { url in
+            let fileExtension = url.pathExtension.lowercased()
+            return AppConstants.supportedImageTypes.contains(fileExtension)
+        }
+        
+        let skippedCount = urls.count - validUrls.count
+        if skippedCount > 0 {
+            showError("Skipped \(skippedCount) unsupported file\(skippedCount == 1 ? "" : "s")")
+        }
+        
+        guard !validUrls.isEmpty else {
+            showError("No supported image files found")
+            return
+        }
+        
         isLoading = true
+        totalImportCount = validUrls.count
+        importingCount = 0
+        importProgress = 0.0
         
         Task {
-            for url in urls {
+            for (index, url) in validUrls.enumerated() {
                 await importSingleImage(from: url)
+                importingCount = index + 1
+                importProgress = Double(importingCount) / Double(totalImportCount)
             }
+            
+            importProgress = 1.0
+            showSuccess("Imported \(validUrls.count) image\(validUrls.count == 1 ? "" : "s") successfully")
             loadInitialData()
+            
+            // Reset progress after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                self.importProgress = 0.0
+                self.importingCount = 0
+                self.totalImportCount = 0
+            }
         }
     }
     
@@ -91,6 +129,7 @@ class MemeManagerViewModel: ObservableObject {
     
     func importFromClipboard() {
         guard let image = NSPasteboard.general.readObjects(forClasses: [NSImage.self], options: nil)?.first as? NSImage else {
+            showError("No image found in clipboard")
             return
         }
         
@@ -126,34 +165,62 @@ class MemeManagerViewModel: ObservableObject {
     }
     
     func copyImageToClipboard(_ image: MemeImage) {
-        guard let nsImage = NSImage(contentsOfFile: image.path) else { return }
+        guard let nsImage = NSImage(contentsOfFile: image.path) else { 
+            showError("Failed to load image for copying")
+            return 
+        }
         
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects([nsImage])
+        showSuccess("Image copied to clipboard")
     }
     
     func deleteImage(_ image: MemeImage) {
-        guard let imageId = image.databaseId else { return }
+        guard let imageId = image.databaseId else { 
+            showError("Cannot delete image: Invalid image ID")
+            return 
+        }
         
         if databaseService.deleteImage(id: imageId) {
             try? FileManager.default.removeItem(atPath: image.path)
+            showSuccess("Image deleted successfully")
             loadInitialData()
+        } else {
+            showError("Failed to delete image")
         }
     }
     
     func addTagsToImage(_ image: MemeImage, tagNames: [String]) {
-        guard let imageId = image.databaseId else { return }
+        guard let imageId = image.databaseId else { 
+            showError("Cannot add tags: Invalid image ID")
+            return 
+        }
         
-        if databaseService.addTagsToImage(imageId: imageId, tagNames: tagNames) {
+        let validTags = tagNames.filter { !$0.isEmpty }
+        guard !validTags.isEmpty else {
+            showError("No valid tags to add")
+            return
+        }
+        
+        if databaseService.addTagsToImage(imageId: imageId, tagNames: validTags) {
+            showSuccess("Tags added successfully")
             loadInitialData()
+        } else {
+            showError("Failed to add tags")
         }
     }
     
     func removeTagFromImage(_ image: MemeImage, tag: Tag) {
-        guard let imageId = image.databaseId else { return }
+        guard let imageId = image.databaseId else { 
+            showError("Cannot remove tag: Invalid image ID")
+            return 
+        }
         
         if databaseService.removeTagFromImage(imageId: imageId, tagId: tag.id) {
+            showSuccess("Tag removed successfully")
             loadInitialData()
+        } else {
+            showError("Failed to remove tag")
         }
     }
     
@@ -168,5 +235,34 @@ class MemeManagerViewModel: ObservableObject {
     func clearFilters() {
         searchText = ""
         selectedTags.removeAll()
+    }
+    
+    func renameImage(_ image: MemeImage, newName: String) {
+        guard let imageId = image.databaseId else { 
+            showError("Cannot rename image: Invalid image ID")
+            return 
+        }
+        
+        guard !newName.isEmpty else {
+            showError("Image name cannot be empty")
+            return
+        }
+        
+        if databaseService.updateImageName(id: imageId, newName: newName) {
+            showSuccess("Image renamed successfully")
+            loadInitialData()
+        } else {
+            showError("Failed to rename image")
+        }
+    }
+    
+    private func showError(_ message: String) {
+        errorMessage = message
+        showingError = true
+    }
+    
+    private func showSuccess(_ message: String) {
+        successMessage = message
+        showingSuccess = true
     }
 }

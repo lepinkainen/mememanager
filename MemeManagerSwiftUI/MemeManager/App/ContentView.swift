@@ -16,6 +16,16 @@ struct ContentView: View {
         .onDrop(of: [UTType.image], isTargeted: nil) { providers in
             handleDrop(providers: providers)
         }
+        .alert("Error", isPresented: $viewModel.showingError) {
+            Button("OK") { }
+        } message: {
+            Text(viewModel.errorMessage ?? "An unknown error occurred")
+        }
+        .alert("Success", isPresented: $viewModel.showingSuccess) {
+            Button("OK") { }
+        } message: {
+            Text(viewModel.successMessage ?? "Operation completed successfully")
+        }
     }
     
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
