@@ -18,8 +18,10 @@ struct ImageDetailView: View {
                     .fontWeight(.semibold)
                 Spacer()
                 Button(action: { 
-                    viewModel.clearSelectedImage()
-                    dismiss() 
+                    Task { @MainActor in
+                        viewModel.clearSelectedImage()
+                        dismiss()
+                    }
                 }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title2)
@@ -123,8 +125,6 @@ struct ImageDetailView: View {
                 .background(Color(NSColor.controlBackgroundColor))
                 .cornerRadius(12)
                 
-                Spacer()
-                
                 // Action buttons
                 HStack(spacing: 16) {
                     Button("Copy to Clipboard") {
@@ -139,8 +139,10 @@ struct ImageDetailView: View {
                     .buttonStyle(.bordered)
                     .help("Delete this image permanently")
                 }
+                .padding(.top, 16)
                 }
                 .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
         .alert("Add Tags", isPresented: $showingTagInput) {
@@ -155,9 +157,11 @@ struct ImageDetailView: View {
         .alert("Delete Image", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
-                viewModel.deleteImage(image)
-                viewModel.clearSelectedImage()
-                dismiss()
+                Task { @MainActor in
+                    viewModel.deleteImage(image)
+                    viewModel.clearSelectedImage()
+                    dismiss()
+                }
             }
         } message: {
             Text("Are you sure you want to delete \"\(image.originalName)\"? This action cannot be undone.")
