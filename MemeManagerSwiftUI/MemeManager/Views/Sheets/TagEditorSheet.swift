@@ -23,170 +23,145 @@ struct TagEditorSheet: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             // Header
             HStack {
-                Text("Edit Tags")
+                Text("Add Tags")
                     .font(.title2)
                     .fontWeight(.semibold)
                 Spacer()
-                Button("Done") {
-                    addTags()
+                Button("Cancel") {
                     dismiss()
                 }
-                .keyboardShortcut(.return)
             }
             .padding()
             
-            Divider()
-            
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Current tags
-                    if !image.tags.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Current Tags")
-                                .font(.headline)
-                            
-                            LazyVGrid(columns: [
-                                GridItem(.adaptive(minimum: 80), spacing: 8)
-                            ], spacing: 8) {
-                                ForEach(image.tags, id: \.id) { tag in
-                                    HStack(spacing: 6) {
-                                        Text(tag.name)
-                                            .font(.caption)
-                                            .fontWeight(.medium)
-                                            .lineLimit(1)
-                                        
-                                        Button(action: {
-                                            viewModel.removeTagFromImage(image, tag: tag)
-                                        }) {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(Color.blue.opacity(0.15))
-                                    .foregroundColor(.blue)
-                                    .cornerRadius(12)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.blue.opacity(0.3), lineWidth: 0.5)
-                                    )
-                                }
-                            }
-                        }
-                    }
+            // Current tags display
+            if !image.tags.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Current Tags:")
+                        .font(.headline)
                     
-                    // Add new tags section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Add New Tags")
-                            .font(.headline)
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            TextField("Enter tags separated by commas", text: $newTagText, axis: .vertical)
-                                .textFieldStyle(.roundedBorder)
-                                .focused($isTextFieldFocused)
-                                .lineLimit(3...6)
-                            
-                            Text("Separate multiple tags with commas")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        // Live preview of tags being typed
-                        if !parsedTags.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Preview")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                
-                                LazyVGrid(columns: [
-                                    GridItem(.adaptive(minimum: 80), spacing: 8)
-                                ], spacing: 8) {
-                                    ForEach(parsedTags, id: \.self) { tag in
-                                        Text(tag)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(image.tags, id: \.id) { tag in
+                                HStack(spacing: 4) {
+                                    Text(tag.name)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                    
+                                    Button(action: {
+                                        viewModel.removeTagFromImage(image, tag: tag)
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
                                             .font(.caption)
-                                            .fontWeight(.medium)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 6)
-                                            .background(Color.green.opacity(0.15))
-                                            .foregroundColor(.green)
-                                            .cornerRadius(12)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .stroke(Color.green.opacity(0.3), lineWidth: 0.5)
-                                            )
+                                            .foregroundColor(.secondary)
                                     }
+                                    .buttonStyle(.plain)
                                 }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.blue.opacity(0.2))
+                                .cornerRadius(8)
                             }
                         }
-                        
-                        // Suggested tags
-                        if !suggestedTags.isEmpty && !newTagText.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Suggestions")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                
-                                LazyVGrid(columns: [
-                                    GridItem(.adaptive(minimum: 80), spacing: 8)
-                                ], spacing: 8) {
-                                    ForEach(suggestedTags.prefix(10), id: \.self) { tag in
-                                        Button(action: {
-                                            addSuggestedTag(tag)
-                                        }) {
-                                            Text(tag)
-                                                .font(.caption)
-                                                .fontWeight(.medium)
-                                                .padding(.horizontal, 10)
-                                                .padding(.vertical, 6)
-                                                .background(Color.gray.opacity(0.15))
-                                                .foregroundColor(.primary)
-                                                .cornerRadius(12)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .stroke(Color.gray.opacity(0.3), lineWidth: 0.5)
-                                                )
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                            }
-                        }
+                        .padding(.horizontal)
                     }
                 }
-                .padding()
+                .padding(.horizontal)
             }
             
-            Divider()
+            // Simple text input - back to regular SwiftUI TextField
+            VStack(alignment: .leading, spacing: 8) {
+                Text("New Tags (comma separated):")
+                    .font(.headline)
+                
+                TextField("Enter tags separated by commas...", text: $newTagText)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($isTextFieldFocused)
+                    .onSubmit {
+                        addTags()
+                        dismiss()
+                    }
+            }
+            .padding(.horizontal)
             
-            // Bottom buttons
-            HStack(spacing: 12) {
+            // Preview tags
+            if !parsedTags.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Preview:")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(parsedTags, id: \.self) { tag in
+                                Text(tag)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.green.opacity(0.2))
+                                    .cornerRadius(8)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            
+            // Suggestions
+            if !suggestedTags.isEmpty && !newTagText.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Suggestions:")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(suggestedTags.prefix(8), id: \.self) { tag in
+                                Button(action: {
+                                    addSuggestedTag(tag)
+                                }) {
+                                    Text(tag)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.gray.opacity(0.2))
+                                        .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            
+            // Action buttons
+            HStack(spacing: 16) {
                 Button("Cancel") {
                     dismiss()
                 }
                 .keyboardShortcut(.escape)
                 
-                Spacer()
-                
                 Button("Add Tags") {
                     addTags()
                     dismiss()
                 }
+                .keyboardShortcut(.return)
                 .disabled(newTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             .padding()
+            
+            Spacer()
         }
-        .frame(minWidth: 500, minHeight: 400)
+        .frame(minWidth: 500, minHeight: 350)
         .onAppear {
-            // Delay focus to ensure the view is fully rendered
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isTextFieldFocused = true
-            }
+            isTextFieldFocused = true
         }
     }
     

@@ -26,6 +26,7 @@ struct ContentView: View {
         } message: {
             Text(viewModel.successMessage ?? "Operation completed successfully")
         }
+        .focusable()
     }
     
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
