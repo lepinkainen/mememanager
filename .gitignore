@@ -195,3 +195,5 @@ storage/
 *.sqlite
 *.sqlite3
 .uv/
+
+.build/
