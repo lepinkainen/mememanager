@@ -1,9 +1,18 @@
 # Meme Manager Project
 
 ## Project Overview
-A desktop application for storing and organizing meme images with tagging, search, and sharing capabilities.
+A desktop application for storing and organizing meme images with tagging, search, and sharing capabilities. **Currently implementing SwiftUI version** alongside the original Python/CustomTkinter design.
 
 ## Technology Stack
+
+### Current Implementation (SwiftUI)
+- **Language**: Swift 5.9+
+- **Framework**: SwiftUI for macOS 14+
+- **Package Manager**: Swift Package Manager
+- **Database**: SQLite via SQLite.swift library  
+- **Architecture**: MVVM with @MainActor view models
+
+### Original Python Implementation
 - **Language**: Python 3.11+
 - **GUI Framework**: CustomTkinter (modern, native-looking GUI)
 - **Database**: SQLite (embedded, no external dependencies)
@@ -11,88 +20,78 @@ A desktop application for storing and organizing meme images with tagging, searc
 - **Dependency Management**: uv (modern Python package manager)
 - **Linting/Formatting**: ruff
 - **Type Checking**: mypy
-- **Task Management**: Taskfile (taskfile.dev/task)
-
-## Core Features (MVP)
-1. **Image Import**:
-   - Drag & drop support
-   - Copy & paste from clipboard
-   - File dialog selection
-   - Support formats: PNG, JPG, JPEG, GIF, WEBP
-
-2. **Storage & Organization**:
-   - Save images to `storage/memes/YYYY/MM/` structure
-   - SQLite database for metadata (tags, names, paths)
-   - Unique filename generation to avoid conflicts
-
-3. **Tagging System**:
-   - Multiple tags per image
-   - Tag autocomplete/suggestions
-   - Tag-based organization
-
-4. **Search & Filter**:
-   - Real-time text search
-   - Search by image name and tags
-   - Combined search functionality
-
-5. **Image Management**:
-   - Copy images to clipboard for sharing
-   - Rename images
-   - Thumbnail grid view
-   - Image preview
 
 ## Project Structure
 ```
 mememanager/
-├── CLAUDE.md                 # This file
-├── Taskfile.yml              # Task definitions
-├── pyproject.toml            # Python project config
-├── src/
-│   ├── main.py               # Application entry point
-│   ├── database/
-│   │   ├── __init__.py
-│   │   └── manager.py        # Database operations
-│   ├── ui/
-│   │   ├── __init__.py
-│   │   ├── main_window.py    # Main application window
-│   │   └── components/       # UI components
-│   └── utils/
-│       ├── __init__.py
-│       └── image_handler.py  # Image processing utilities
-├── storage/
-│   └── memes/                # Image storage directory
-└── build/                    # Build artifacts
+├── CLAUDE.md                          # This file  
+├── MemeManagerSwiftUI/                # SwiftUI implementation
+│   ├── Package.swift                  # Swift package definition
+│   └── MemeManager/                   # Main source code
+│       ├── App/                       # App entry point
+│       ├── Models/                    # Data models (MemeImage, Tag)
+│       ├── Services/                  # Business logic layer
+│       │   ├── DatabaseService.swift  # SQLite operations
+│       │   ├── FileManagerService.swift
+│       │   ├── ImageProcessingService.swift
+│       │   ├── ClipboardService.swift
+│       │   └── ThumbnailManager.swift
+│       ├── ViewModels/                # MVVM layer
+│       ├── Views/                     # SwiftUI views
+│       │   ├── Main/                  # Primary interface
+│       │   ├── Components/            # Reusable UI components
+│       │   └── Sheets/                # Modal dialogs
+│       └── Utils/                     # Helper utilities
+├── storage/                           # Image storage
+│   ├── memes/YYYY/MM/                 # Organized by date
+│   └── thumbnails/YYYY/MM/            # Generated thumbnails
+└── plan/                              # Development documentation
 ```
 
-## Database Schema
+## Architecture Patterns
+
+### Service Layer
+All business logic is centralized in service classes:
+- `DatabaseService.shared` - Singleton for SQLite operations
+- `FileManagerService.shared` - File system operations with date-based organization
+- `ImageProcessingService.shared` - Image manipulation and thumbnail generation
+- `ClipboardService` - System clipboard integration
+- `ThumbnailManager` - Async thumbnail generation and caching
+
+### MVVM Implementation
+- `MemeManagerViewModel` handles UI state with `@Published` properties
+- Uses Combine for reactive search (300ms debounce)
+- `@MainActor` ensures UI updates happen on main thread
+- View models coordinate between Services and Views
+
+### Database Schema
 - **images**: id, filename, original_name, path, created_date, updated_date
-- **tags**: id, name
-- **image_tags**: image_id, tag_id (junction table)
+- **tags**: id, name (unique constraint)
+- **image_tags**: image_id, tag_id (junction table with cascade deletes)
 
-## Commands (via Taskfile)
-- `task build` - Build the application
-- `task test` - Run tests
-- `task lint` - Run ruff linting
-- `task format` - Format code with ruff
-- `task typecheck` - Run mypy type checking
+## Development Commands
 
-## Development Guidelines
-- Follow tech stack guidelines from `llm-shared/project_tech_stack.md`
-- Use uv for dependency management
-- All code should pass ruff linting and mypy type checking
-- Build artifacts go in `build/` directory
-- Test thoroughly before marking tasks complete
+### SwiftUI Build
+```bash
+cd MemeManagerSwiftUI && swift build
+cd MemeManagerSwiftUI && swift run
+```
 
-## Future Enhancements (Post-MVP)
-- LLM integration for auto-tagging (Ollama/OpenAI)
-- Multi-platform packaging
-- Advanced filtering options
-- Export functionality
-- Duplicate image detection
-- Image editing capabilities
+### Development Guidelines
+- Follow `llm-shared/project_tech_stack.md` for dependency choices
+- Use service singletons for shared state (DatabaseService, FileManagerService, etc.)
+- All UI updates must be `@MainActor` or dispatched to main queue
+- File operations use security-scoped resources for sandbox compliance
+- Store images in `storage/memes/YYYY/MM/` with unique filenames to avoid conflicts
+- Generate thumbnails asynchronously in `storage/thumbnails/YYYY/MM/`
+
+## Core Features (Implemented)
+1. **Image Import**: Drag & drop, clipboard paste, file dialog
+2. **Storage**: Date-organized folders with SQLite metadata tracking
+3. **Search**: Real-time text + tag filtering with Combine debouncing
+4. **Tagging**: Many-to-many relationships with junction table
+5. **Thumbnails**: Async generation with caching for performance
+6. **Clipboard**: Copy images back to system clipboard
 
 ## Current Status
-Project is in initial development phase. Core MVP features are being implemented first, with LLM integration planned for a later iteration.
-
-## Personal Development Notes
-- When working from a markdown checklist ALWAYS check off the tasks when they're done
+SwiftUI implementation is functional with core MVP features complete. The original Python design exists as documentation/reference but the active development is on the SwiftUI version.
