@@ -1,0 +1,2307 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+MemeManager/
+  App/
+    ContentView.swift
+    MemeManagerApp.swift
+  Models/
+    MemeImage.swift
+    Tag.swift
+  Resources/
+    MemeManager.entitlements
+  Services/
+    ClipboardService.swift
+    DatabaseService.swift
+    FileManagerService.swift
+    ImageProcessingService.swift
+    ThumbnailManager.swift
+  Utils/
+    Constants.swift
+  ViewModels/
+    MemeManagerViewModel.swift
+  Views/
+    Components/
+      ImageDetailView.swift
+      ImageGridView.swift
+      ImageThumbnailView.swift
+    Main/
+      MainView.swift
+      SidebarView.swift
+    Sheets/
+      TagEditorSheet.swift
+.gitignore
+Package.swift
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="MemeManager/App/ContentView.swift">
+import SwiftUI
+import UniformTypeIdentifiers
+import AppKit
+
+struct ContentView: View {
+    @StateObject private var viewModel = MemeManagerViewModel()
+    
+    var body: some View {
+        NavigationSplitView {
+            SidebarView()
+                .environmentObject(viewModel)
+        } detail: {
+            MainView()
+                .environmentObject(viewModel)
+        }
+        .navigationTitle("🎭 Meme Manager")
+        .onDrop(of: [UTType.image], isTargeted: nil) { providers in
+            handleDrop(providers: providers)
+        }
+        .alert("Error", isPresented: $viewModel.showingError) {
+            Button("OK") { }
+        } message: {
+            Text(viewModel.errorMessage ?? "An unknown error occurred")
+        }
+        .alert("Success", isPresented: $viewModel.showingSuccess) {
+            Button("OK") { }
+        } message: {
+            Text(viewModel.successMessage ?? "Operation completed successfully")
+        }
+        .focusable()
+        .onAppear {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+    
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        let group = DispatchGroup()
+        var urls: [URL] = []
+        
+        for provider in providers {
+            if provider.canLoadObject(ofClass: URL.self) {
+                group.enter()
+                _ = provider.loadObject(ofClass: URL.self) { object, error in
+                    if let url = object {
+                        urls.append(url)
+                    }
+                    group.leave()
+                }
+            }
+        }
+        
+        group.notify(queue: .main) {
+            if !urls.isEmpty {
+                viewModel.importImages(from: urls)
+            }
+        }
+        
+        return !providers.isEmpty
+    }
+}
+</file>
+
+<file path="MemeManager/App/MemeManagerApp.swift">
+import SwiftUI
+
+@main
+struct MemeManagerApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .frame(minWidth: 1000, minHeight: 700)
+        }
+        .windowResizability(.contentSize)
+        .commands {
+            CommandGroup(after: .newItem) {
+                Button("Import from Clipboard") {
+                    // This needs to be handled at the view level
+                }
+                .keyboardShortcut("v", modifiers: [.command, .shift])
+                .disabled(true) // Will be enabled when implemented properly
+            }
+        }
+    }
+}
+</file>
+
+<file path="MemeManager/Models/MemeImage.swift">
+import Foundation
+
+struct MemeImage: Identifiable, Codable {
+    let databaseId: Int?
+    let filename: String
+    let originalName: String
+    let path: String
+    let createdDate: Date
+    let updatedDate: Date
+    
+    var tags: [Tag] = []
+    
+    // Identifiable conformance using filename as unique identifier
+    var id: String { filename }
+    
+    private enum CodingKeys: String, CodingKey {
+        case databaseId = "id"
+        case filename, originalName, path, createdDate, updatedDate
+    }
+}
+</file>
+
+<file path="MemeManager/Models/Tag.swift">
+import Foundation
+
+struct Tag: Identifiable, Codable, Hashable {
+    let id: Int
+    let name: String
+}
+</file>
+
+<file path="MemeManager/Resources/MemeManager.entitlements">
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    <key>com.apple.security.files.bookmarks.app-scope</key>
+    <true/>
+</dict>
+</plist>
+</file>
+
+<file path="MemeManager/Services/ClipboardService.swift">
+import AppKit
+import UniformTypeIdentifiers
+
+class ClipboardService: ObservableObject {
+    private let pasteboard = NSPasteboard.general
+    
+    // MARK: - Reading from Clipboard
+    func getImageFromClipboard() -> NSImage? {
+        // Try to get image data directly
+        if let imageData = pasteboard.data(forType: .tiff),
+           let image = NSImage(data: imageData) {
+            return image
+        }
+        
+        // Try PNG format
+        if let imageData = pasteboard.data(forType: .png),
+           let image = NSImage(data: imageData) {
+            return image
+        }
+        
+        // Try JPEG format
+        if let imageData = pasteboard.data(forType: NSPasteboard.PasteboardType("public.jpeg")),
+           let image = NSImage(data: imageData) {
+            return image
+        }
+        
+        // Try file URL (for copied files)
+        if let fileURL = getFileURLFromClipboard(),
+           FileManager.default.fileExists(atPath: fileURL.path) {
+            return NSImage(contentsOf: fileURL)
+        }
+        
+        return nil
+    }
+    
+    private func getFileURLFromClipboard() -> URL? {
+        // Try to get file URLs directly
+        if let fileURLs = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+           let firstURL = fileURLs.first {
+            return firstURL
+        }
+        
+        // Try to parse string as URL
+        guard let string = pasteboard.string(forType: .string),
+              let url = URL(string: string),
+              url.isFileURL else {
+            return nil
+        }
+        
+        return url
+    }
+    
+    func hasImageInClipboard() -> Bool {
+        return pasteboard.canReadItem(withDataConformingToTypes: [
+            NSPasteboard.PasteboardType.png.rawValue,
+            NSPasteboard.PasteboardType.tiff.rawValue,
+            "public.jpeg",
+            NSPasteboard.PasteboardType.fileURL.rawValue
+        ])
+    }
+    
+    // MARK: - Writing to Clipboard
+    func copyImageToClipboard(_ image: NSImage) -> Bool {
+        guard let tiffData = image.tiffRepresentation else { return false }
+        
+        pasteboard.clearContents()
+        return pasteboard.setData(tiffData, forType: .tiff)
+    }
+    
+    func copyImageFileToClipboard(from url: URL) -> Bool {
+        guard let image = NSImage(contentsOf: url) else { return false }
+        return copyImageToClipboard(image)
+    }
+    
+    func copyImageDataToClipboard(_ data: Data, type: NSPasteboard.PasteboardType) -> Bool {
+        pasteboard.clearContents()
+        return pasteboard.setData(data, forType: type)
+    }
+}
+</file>
+
+<file path="MemeManager/Services/DatabaseService.swift">
+import Foundation
+import SQLite
+import SwiftUI
+
+class DatabaseService: ObservableObject {
+    static let shared = DatabaseService()
+    
+    private var db: Connection?
+    
+    // Table definitions
+    private let images = Table("images")
+    private let tags = Table("tags")
+    private let imageTags = Table("image_tags")
+    
+    // Images table columns
+    private let imageId = Expression<Int>("id")
+    private let imageFilename = Expression<String>("filename")
+    private let imageOriginalName = Expression<String>("original_name")
+    private let imagePath = Expression<String>("path")
+    private let imageCreatedDate = Expression<Date>("created_date")
+    private let imageUpdatedDate = Expression<Date>("updated_date")
+    
+    // Tags table columns
+    private let tagId = Expression<Int>("id")
+    private let tagName = Expression<String>("name")
+    
+    // Image-Tags junction table columns
+    private let jtImageId = Expression<Int>("image_id")
+    private let jtTagId = Expression<Int>("tag_id")
+    
+    private init() {
+        initializeDatabase()
+    }
+    
+    private func initializeDatabase() {
+        do {
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let storageURL = documentsPath.appendingPathComponent(AppConstants.storageDirectory)
+            
+            // Create storage directory if needed
+            if !FileManager.default.fileExists(atPath: storageURL.path) {
+                try FileManager.default.createDirectory(at: storageURL, withIntermediateDirectories: true)
+            }
+            
+            let dbURL = storageURL.appendingPathComponent("memes.db")
+            db = try Connection(dbURL.path)
+            
+            createTables()
+        } catch {
+            print("Database initialization failed: \(error)")
+        }
+    }
+    
+    private func createTables() {
+        do {
+            // Create images table
+            try db?.run(images.create(ifNotExists: true) { t in
+                t.column(imageId, primaryKey: .autoincrement)
+                t.column(imageFilename)
+                t.column(imageOriginalName)
+                t.column(imagePath)
+                t.column(imageCreatedDate)
+                t.column(imageUpdatedDate)
+            })
+            
+            // Create tags table
+            try db?.run(tags.create(ifNotExists: true) { t in
+                t.column(tagId, primaryKey: .autoincrement)
+                t.column(tagName, unique: true)
+            })
+            
+            // Create image-tags junction table
+            try db?.run(imageTags.create(ifNotExists: true) { t in
+                t.column(jtImageId)
+                t.column(jtTagId)
+                t.primaryKey(jtImageId, jtTagId)
+                t.foreignKey(jtImageId, references: images, imageId, delete: .cascade)
+                t.foreignKey(jtTagId, references: tags, tagId, delete: .cascade)
+            })
+            
+            print("Database tables created successfully")
+        } catch {
+            print("Failed to create tables: \(error)")
+        }
+    }
+    
+    // MARK: - Image Operations
+    func createImage(_ image: MemeImage) -> Bool {
+        guard let db = db else { return false }
+        
+        do {
+            let insert = images.insert(
+                imageFilename <- image.filename,
+                imageOriginalName <- image.originalName,
+                imagePath <- image.path,
+                imageCreatedDate <- image.createdDate,
+                imageUpdatedDate <- image.updatedDate
+            )
+            try db.run(insert)
+            return true
+        } catch {
+            print("Failed to insert image: \(error)")
+            return false
+        }
+    }
+    
+    func getAllImages() -> [MemeImage] {
+        guard let db = db else { return [] }
+        
+        do {
+            var memeImages: [MemeImage] = []
+            for row in try db.prepare(images.order(imageCreatedDate.desc)) {
+                let image = MemeImage(
+                    databaseId: row[imageId],
+                    filename: row[imageFilename],
+                    originalName: row[imageOriginalName],
+                    path: row[imagePath],
+                    createdDate: row[imageCreatedDate],
+                    updatedDate: row[imageUpdatedDate],
+                    tags: getTagsForImage(imageId: row[imageId])
+                )
+                memeImages.append(image)
+            }
+            return memeImages
+        } catch {
+            print("Failed to fetch images: \(error)")
+            return []
+        }
+    }
+    
+    func getImage(by id: Int) -> MemeImage? {
+        guard let db = db else { return nil }
+        
+        do {
+            let query = images.filter(imageId == id)
+            if let row = try db.pluck(query) {
+                return MemeImage(
+                    databaseId: row[imageId],
+                    filename: row[imageFilename],
+                    originalName: row[imageOriginalName],
+                    path: row[imagePath],
+                    createdDate: row[imageCreatedDate],
+                    updatedDate: row[imageUpdatedDate],
+                    tags: getTagsForImage(imageId: row[imageId])
+                )
+            }
+        } catch {
+            print("Failed to fetch image: \(error)")
+        }
+        return nil
+    }
+    
+    func updateImage(_ image: MemeImage) -> Bool {
+        guard let db = db, let id = image.databaseId else { return false }
+        
+        do {
+            let imageToUpdate = images.filter(imageId == id)
+            let update = imageToUpdate.update(
+                imageFilename <- image.filename,
+                imageOriginalName <- image.originalName,
+                imagePath <- image.path,
+                imageUpdatedDate <- Date()
+            )
+            try db.run(update)
+            return true
+        } catch {
+            print("Failed to update image: \(error)")
+            return false
+        }
+    }
+    
+    func deleteImage(id: Int) -> Bool {
+        guard let db = db else { return false }
+        
+        do {
+            let imageToDelete = images.filter(imageId == id)
+            try db.run(imageToDelete.delete())
+            return true
+        } catch {
+            print("Failed to delete image: \(error)")
+            return false
+        }
+    }
+    
+    // MARK: - Tag Operations
+    func createTag(_ tag: Tag) -> Bool {
+        guard let db = db else { return false }
+        
+        do {
+            let insert = tags.insert(tagName <- tag.name)
+            try db.run(insert)
+            return true
+        } catch {
+            print("Failed to insert tag: \(error)")
+            return false
+        }
+    }
+    
+    func createTagIfNotExists(name: String) -> Int? {
+        guard let db = db else { return nil }
+        
+        // First check if tag exists
+        if let existingTag = getTagByName(name) {
+            return existingTag.id
+        }
+        
+        // Create new tag
+        do {
+            let insert = tags.insert(tagName <- name)
+            let tagId = try db.run(insert)
+            return Int(tagId)
+        } catch {
+            print("Failed to create tag: \(error)")
+            return nil
+        }
+    }
+    
+    func getAllTags() -> [Tag] {
+        guard let db = db else { return [] }
+        
+        do {
+            var tagList: [Tag] = []
+            for row in try db.prepare(tags.order(tagName)) {
+                let tag = Tag(
+                    id: row[tagId],
+                    name: row[tagName]
+                )
+                tagList.append(tag)
+            }
+            return tagList
+        } catch {
+            print("Failed to fetch tags: \(error)")
+            return []
+        }
+    }
+    
+    func getTagByName(_ name: String) -> Tag? {
+        guard let db = db else { return nil }
+        
+        do {
+            let query = tags.filter(tagName == name)
+            if let row = try db.pluck(query) {
+                return Tag(id: row[tagId], name: row[tagName])
+            }
+        } catch {
+            print("Failed to fetch tag by name: \(error)")
+        }
+        return nil
+    }
+    
+    func updateImageName(id: Int, newName: String) -> Bool {
+        guard let db = db else { return false }
+        
+        do {
+            let imageToUpdate = images.filter(imageId == id)
+            let update = imageToUpdate.update(imageOriginalName <- newName, imageUpdatedDate <- Date())
+            let changes = try db.run(update)
+            return changes > 0
+        } catch {
+            print("Failed to update image name: \(error)")
+            return false
+        }
+    }
+    
+    func getTagsForImage(imageId: Int) -> [Tag] {
+        guard let db = db else { return [] }
+        
+        do {
+            var imageTagsList: [Tag] = []
+            let query = tags
+                .join(imageTags, on: tagId == jtTagId)
+                .filter(jtImageId == imageId)
+                .order(tagName)
+            
+            for row in try db.prepare(query) {
+                let tag = Tag(
+                    id: row[tagId],
+                    name: row[tagName]
+                )
+                imageTagsList.append(tag)
+            }
+            return imageTagsList
+        } catch {
+            print("Failed to fetch tags for image: \(error)")
+            return []
+        }
+    }
+    
+    func deleteTag(id: Int) -> Bool {
+        guard let db = db else { return false }
+        
+        do {
+            let tagToDelete = tags.filter(tagId == id)
+            try db.run(tagToDelete.delete())
+            return true
+        } catch {
+            print("Failed to delete tag: \(error)")
+            return false
+        }
+    }
+    
+    // MARK: - Image-Tag Association Operations
+    func addTagToImage(imageId: Int, tagId: Int) -> Bool {
+        guard let db = db else { return false }
+        
+        do {
+            let insert = imageTags.insert(
+                jtImageId <- imageId,
+                jtTagId <- tagId
+            )
+            try db.run(insert)
+            return true
+        } catch {
+            print("Failed to associate tag with image: \(error)")
+            return false
+        }
+    }
+    
+    func addTagsToImage(imageId: Int, tagNames: [String]) -> Bool {
+        var success = true
+        
+        for tagName in tagNames {
+            guard let tagId = createTagIfNotExists(name: tagName) else {
+                success = false
+                continue
+            }
+            
+            if !addTagToImage(imageId: imageId, tagId: tagId) {
+                success = false
+            }
+        }
+        
+        return success
+    }
+    
+    func removeTagFromImage(imageId: Int, tagId: Int) -> Bool {
+        guard let db = db else { return false }
+        
+        do {
+            let association = imageTags.filter(jtImageId == imageId && jtTagId == tagId)
+            try db.run(association.delete())
+            return true
+        } catch {
+            print("Failed to remove tag from image: \(error)")
+            return false
+        }
+    }
+    
+    func removeAllTagsFromImage(imageId: Int) -> Bool {
+        guard let db = db else { return false }
+        
+        do {
+            let associations = imageTags.filter(jtImageId == imageId)
+            try db.run(associations.delete())
+            return true
+        } catch {
+            print("Failed to remove all tags from image: \(error)")
+            return false
+        }
+    }
+    
+    // MARK: - Search Operations
+    func searchImages(query: String) -> [MemeImage] {
+        guard let db = db else { return [] }
+        
+        if query.isEmpty {
+            return getAllImages()
+        }
+        
+        do {
+            var memeImages: [MemeImage] = []
+            let searchQuery = images.filter(
+                imageOriginalName.like("%\(query)%") ||
+                imageFilename.like("%\(query)%")
+            ).order(imageCreatedDate.desc)
+            
+            for row in try db.prepare(searchQuery) {
+                let image = MemeImage(
+                    databaseId: row[imageId],
+                    filename: row[imageFilename],
+                    originalName: row[imageOriginalName],
+                    path: row[imagePath],
+                    createdDate: row[imageCreatedDate],
+                    updatedDate: row[imageUpdatedDate],
+                    tags: getTagsForImage(imageId: row[imageId])
+                )
+                memeImages.append(image)
+            }
+            return memeImages
+        } catch {
+            print("Failed to search images: \(error)")
+            return []
+        }
+    }
+    
+    func searchImagesByTags(tagNames: [String]) -> [MemeImage] {
+        guard !tagNames.isEmpty else { return [] }
+        
+        // Simple approach: get all images and filter by tags in memory
+        let allImages = getAllImages()
+        return allImages.filter { image in
+            let imageTags = image.tags.map { $0.name.lowercased() }
+            return tagNames.allSatisfy { tagName in
+                imageTags.contains(where: { $0.contains(tagName.lowercased()) })
+            }
+        }
+    }
+    
+    func searchImagesWithTextAndTags(textQuery: String, tagNames: [String]) -> [MemeImage] {
+        if textQuery.isEmpty && tagNames.isEmpty {
+            return getAllImages()
+        }
+        
+        if tagNames.isEmpty {
+            return searchImages(query: textQuery)
+        }
+        
+        if textQuery.isEmpty {
+            return searchImagesByTags(tagNames: tagNames)
+        }
+        
+        // Combine text and tag search
+        let textResults = searchImages(query: textQuery)
+        return textResults.filter { image in
+            let imageTags = image.tags.map { $0.name.lowercased() }
+            return tagNames.allSatisfy { tagName in
+                imageTags.contains(where: { $0.contains(tagName.lowercased()) })
+            }
+        }
+    }
+}
+</file>
+
+<file path="MemeManager/Services/FileManagerService.swift">
+import Foundation
+
+class FileManagerService {
+    static let shared = FileManagerService()
+    
+    private let fileManager = FileManager.default
+    private var documentsDirectory: URL {
+        fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+    }
+    
+    private init() {
+        createDirectoriesIfNeeded()
+    }
+    
+    private func createDirectoriesIfNeeded() {
+        let storageURL = documentsDirectory.appendingPathComponent(AppConstants.storageDirectory)
+        let memesURL = storageURL.appendingPathComponent("memes")
+        let thumbnailsURL = storageURL.appendingPathComponent("thumbnails")
+        
+        [storageURL, memesURL, thumbnailsURL].forEach { url in
+            if !fileManager.fileExists(atPath: url.path) {
+                try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+            }
+        }
+    }
+    
+    func getStorageURL(for year: Int, month: Int) -> URL {
+        let yearMonth = String(format: "%04d/%02d", year, month)
+        return documentsDirectory
+            .appendingPathComponent(AppConstants.storageDirectory)
+            .appendingPathComponent("memes")
+            .appendingPathComponent(yearMonth)
+    }
+    
+    func getThumbnailURL(for year: Int, month: Int) -> URL {
+        let yearMonth = String(format: "%04d/%02d", year, month)
+        return documentsDirectory
+            .appendingPathComponent(AppConstants.storageDirectory)
+            .appendingPathComponent("thumbnails")
+            .appendingPathComponent(yearMonth)
+    }
+    
+    func generateUniqueFilename(originalName: String) -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
+        let timestamp = dateFormatter.string(from: Date())
+        
+        let randomSuffix = String(format: "%08x", arc4random())
+        let nameWithoutExtension = (originalName as NSString).deletingPathExtension
+        let fileExtension = (originalName as NSString).pathExtension
+        
+        return "\(timestamp)_\(randomSuffix)_\(nameWithoutExtension).\(fileExtension)"
+    }
+    
+    func saveImage(from sourceURL: URL, originalName: String) -> String? {
+        let now = Date()
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: now)
+        let month = calendar.component(.month, from: now)
+        
+        let storageURL = getStorageURL(for: year, month: month)
+        
+        // Create directory if needed
+        if !fileManager.fileExists(atPath: storageURL.path) {
+            try? fileManager.createDirectory(at: storageURL, withIntermediateDirectories: true)
+        }
+        
+        let filename = generateUniqueFilename(originalName: originalName)
+        let destinationURL = storageURL.appendingPathComponent(filename)
+        
+        do {
+            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            return destinationURL.path
+        } catch {
+            print("Error saving image: \(error)")
+            return nil
+        }
+    }
+    
+    func getThumbnailPath(for filename: String) -> URL {
+        let now = Date()
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: now)
+        let month = calendar.component(.month, from: now)
+        
+        let thumbnailDirectory = getThumbnailURL(for: year, month: month)
+        let thumbnailFilename = (filename as NSString).deletingPathExtension + "_thumb.jpg"
+        
+        return thumbnailDirectory.appendingPathComponent(thumbnailFilename)
+    }
+    
+    func saveImageFromData(_ data: Data, originalName: String) -> String? {
+        let now = Date()
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: now)
+        let month = calendar.component(.month, from: now)
+        
+        let storageURL = getStorageURL(for: year, month: month)
+        
+        // Create directory if needed
+        if !fileManager.fileExists(atPath: storageURL.path) {
+            try? fileManager.createDirectory(at: storageURL, withIntermediateDirectories: true)
+        }
+        
+        let filename = generateUniqueFilename(originalName: originalName)
+        let destinationURL = storageURL.appendingPathComponent(filename)
+        
+        do {
+            try data.write(to: destinationURL)
+            return destinationURL.path
+        } catch {
+            print("Error saving image from data: \(error)")
+            return nil
+        }
+    }
+}
+</file>
+
+<file path="MemeManager/Services/ImageProcessingService.swift">
+import Foundation
+import AppKit
+import UniformTypeIdentifiers
+import CoreGraphics
+
+struct ImageInfo {
+    let size: CGSize
+    let fileSize: Int64
+    let type: UTType
+}
+
+class ImageProcessingService: ObservableObject {
+    static let shared = ImageProcessingService()
+    
+    static let thumbnailSize = CGSize(width: 200, height: 200)
+    static let maxImageSize = CGSize(width: 2048, height: 2048)
+    static let supportedTypes: [UTType] = [.png, .jpeg, .gif, .bmp]
+    
+    private let fileManager: FileManagerService
+    
+    private init() {
+        self.fileManager = FileManagerService.shared
+    }
+    
+    // MARK: - Image Processing
+    func createThumbnail(from imageURL: URL) async -> NSImage? {
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let image = NSImage(contentsOf: imageURL) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                
+                guard let self = self else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                
+                let thumbnail = self.resizeImage(image, to: Self.thumbnailSize)
+                continuation.resume(returning: thumbnail)
+            }
+        }
+    }
+    
+    private func resizeImage(_ image: NSImage, to size: CGSize) -> NSImage {
+        let newImage = NSImage(size: size)
+        newImage.lockFocus()
+        defer { newImage.unlockFocus() }
+        
+        image.draw(in: NSRect(origin: .zero, size: size),
+                   from: NSRect(origin: .zero, size: image.size),
+                   operation: .sourceOver,
+                   fraction: 1.0)
+        
+        return newImage
+    }
+    
+    func optimizeImage(_ image: NSImage) -> NSImage {
+        guard image.size.width > Self.maxImageSize.width ||
+              image.size.height > Self.maxImageSize.height else {
+            return image
+        }
+        
+        let aspectRatio = image.size.width / image.size.height
+        var newSize = Self.maxImageSize
+        
+        if aspectRatio > 1 {
+            newSize.height = newSize.width / aspectRatio
+        } else {
+            newSize.width = newSize.height * aspectRatio
+        }
+        
+        return resizeImage(image, to: newSize)
+    }
+    
+    // MARK: - File Validation
+    func isSupportedImageType(_ url: URL) -> Bool {
+        guard let contentType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType else {
+            return false
+        }
+        
+        return Self.supportedTypes.contains { supportedType in
+            contentType.conforms(to: supportedType)
+        }
+    }
+    
+    func validateImageFile(at url: URL) -> Bool {
+        guard url.isFileURL && isSupportedImageType(url) else { return false }
+        
+        // Try to load the image to verify it's valid
+        return NSImage(contentsOf: url) != nil
+    }
+    
+    // MARK: - Image Information
+    func getImageInfo(from url: URL) -> ImageInfo? {
+        guard let image = NSImage(contentsOf: url) else { return nil }
+        
+        let resourceValues = try? url.resourceValues(forKeys: [.fileSizeKey, .contentTypeKey])
+        let fileSize = resourceValues?.fileSize ?? 0
+        let contentType = resourceValues?.contentType ?? UTType.image
+        
+        return ImageInfo(
+            size: image.size,
+            fileSize: Int64(fileSize),
+            type: contentType
+        )
+    }
+    
+    // MARK: - Legacy Methods (for backward compatibility)
+    func generateThumbnail(from imagePath: String) -> NSImage? {
+        guard let image = NSImage(contentsOfFile: imagePath) else {
+            return nil
+        }
+        
+        return resizeImage(image, to: AppConstants.thumbnailSize)
+    }
+    
+    func saveThumbnail(_ thumbnail: NSImage, to path: String) -> Bool {
+        guard let tiffData = thumbnail.tiffRepresentation,
+              let bitmapImageRep = NSBitmapImageRep(data: tiffData),
+              let jpegData = bitmapImageRep.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) else {
+            return false
+        }
+        
+        do {
+            try jpegData.write(to: URL(fileURLWithPath: path))
+            return true
+        } catch {
+            print("Error saving thumbnail: \(error)")
+            return false
+        }
+    }
+    
+    func isValidImageFile(_ url: URL) -> Bool {
+        return validateImageFile(at: url)
+    }
+}
+</file>
+
+<file path="MemeManager/Services/ThumbnailManager.swift">
+import AppKit
+import Foundation
+
+actor ThumbnailCache {
+    private var cache: [String: NSImage] = [:]
+    private let maxCacheSize = 100 // Maximum cached thumbnails
+    
+    func getThumbnail(for key: String) -> NSImage? {
+        return cache[key]
+    }
+    
+    func setThumbnail(_ image: NSImage, for key: String) {
+        if cache.count >= maxCacheSize {
+            // Remove oldest entries (simple FIFO)
+            let keysToRemove = Array(cache.keys.prefix(10))
+            for key in keysToRemove {
+                cache.removeValue(forKey: key)
+            }
+        }
+        cache[key] = image
+    }
+    
+    func clearCache() {
+        cache.removeAll()
+    }
+}
+
+@MainActor
+class ThumbnailManager: ObservableObject {
+    private let cache = ThumbnailCache()
+    private let imageProcessor: ImageProcessingService
+    private let fileManager: FileManagerService
+    
+    init(imageProcessor: ImageProcessingService, fileManager: FileManagerService) {
+        self.imageProcessor = imageProcessor
+        self.fileManager = fileManager
+    }
+    
+    func getThumbnail(for image: MemeImage) async -> NSImage? {
+        let cacheKey = image.filename
+        
+        // Check cache first
+        if let cachedThumbnail = await cache.getThumbnail(for: cacheKey) {
+            return cachedThumbnail
+        }
+        
+        // Check if thumbnail file exists
+        let thumbnailPath = fileManager.getThumbnailPath(for: image.filename)
+        if FileManager.default.fileExists(atPath: thumbnailPath.path) {
+            if let thumbnail = NSImage(contentsOf: thumbnailPath) {
+                await cache.setThumbnail(thumbnail, for: cacheKey)
+                return thumbnail
+            }
+        }
+        
+        // Generate new thumbnail
+        guard let imageURL = URL(string: "file://" + image.path) else { return nil }
+        
+        if let thumbnail = await imageProcessor.createThumbnail(from: imageURL) {
+            // Save thumbnail to disk
+            saveThumbnailToDisk(thumbnail, at: thumbnailPath)
+            
+            // Cache in memory
+            await cache.setThumbnail(thumbnail, for: cacheKey)
+            
+            return thumbnail
+        }
+        
+        return nil
+    }
+    
+    private func saveThumbnailToDisk(_ image: NSImage, at url: URL) {
+        guard let tiffData = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData),
+              let jpegData = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) else {
+            return
+        }
+        
+        // Ensure directory exists
+        let directory = url.deletingLastPathComponent()
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        
+        try? jpegData.write(to: url)
+    }
+    
+    func clearCache() async {
+        await cache.clearCache()
+    }
+    
+    func deleteThumbnail(for image: MemeImage) {
+        let thumbnailPath = fileManager.getThumbnailPath(for: image.filename)
+        try? FileManager.default.removeItem(at: thumbnailPath)
+    }
+}
+</file>
+
+<file path="MemeManager/Utils/Constants.swift">
+import Foundation
+
+struct AppConstants {
+    // File System
+    static let storageDirectory = "MemeManager"
+    static let thumbnailDirectory = "Thumbnails"
+    static let databaseName = "MemeManager.db"
+    
+    // Image Processing
+    static let thumbnailSize = CGSize(width: 200, height: 200)
+    static let maxImageSize = CGSize(width: 2048, height: 2048)
+    
+    // Supported Formats
+    static let supportedImageTypes = ["png", "jpg", "jpeg", "gif", "webp", "bmp"]
+    
+    // UI
+    static let gridColumns = 4
+    static let gridSpacing: CGFloat = 10
+}
+</file>
+
+<file path="MemeManager/ViewModels/MemeManagerViewModel.swift">
+import SwiftUI
+import Combine
+import UniformTypeIdentifiers
+
+@MainActor
+class MemeManagerViewModel: ObservableObject {
+    @Published var images: [MemeImage] = []
+    @Published var searchText: String = ""
+    @Published var selectedTags: Set<String> = []
+    @Published var allTags: [Tag] = []
+    @Published var isLoading: Bool = false
+    @Published var selectedImage: MemeImage?
+    @Published var errorMessage: String?
+    @Published var showingError: Bool = false
+    @Published var successMessage: String?
+    @Published var showingSuccess: Bool = false
+    @Published var importProgress: Double = 0.0
+    @Published var importingCount: Int = 0
+    @Published var totalImportCount: Int = 0
+    
+    private let databaseService = DatabaseService.shared
+    private let fileManagerService = FileManagerService.shared
+    let imageProcessingService = ImageProcessingService.shared
+    private let clipboardService = ClipboardService()
+    private lazy var thumbnailManager = ThumbnailManager(
+        imageProcessor: imageProcessingService,
+        fileManager: fileManagerService
+    )
+    
+    private var cancellables = Set<AnyCancellable>()
+    
+    init() {
+        setupSearchSubscription()
+        loadInitialData()
+    }
+    
+    private func setupSearchSubscription() {
+        Publishers.CombineLatest($searchText, $selectedTags)
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] searchText, selectedTags in
+                self?.performSearch(text: searchText, tags: Array(selectedTags))
+            }
+            .store(in: &cancellables)
+    }
+    
+    func loadInitialData() {
+        isLoading = true
+        
+        Task {
+            images = databaseService.getAllImages()
+            allTags = databaseService.getAllTags()
+            isLoading = false
+        }
+    }
+    
+    private func performSearch(text: String, tags: [String]) {
+        isLoading = true
+        
+        Task {
+            if text.isEmpty && tags.isEmpty {
+                images = databaseService.getAllImages()
+            } else {
+                images = databaseService.searchImagesWithTextAndTags(textQuery: text, tagNames: tags)
+            }
+            isLoading = false
+        }
+    }
+    
+    func importImages(from urls: [URL]) {
+        // Filter valid image URLs
+        let validUrls = urls.filter { url in
+            let fileExtension = url.pathExtension.lowercased()
+            return AppConstants.supportedImageTypes.contains(fileExtension)
+        }
+        
+        let skippedCount = urls.count - validUrls.count
+        if skippedCount > 0 {
+            showError("Skipped \(skippedCount) unsupported file\(skippedCount == 1 ? "" : "s")")
+        }
+        
+        guard !validUrls.isEmpty else {
+            showError("No supported image files found")
+            return
+        }
+        
+        isLoading = true
+        totalImportCount = validUrls.count
+        importingCount = 0
+        importProgress = 0.0
+        
+        Task {
+            for (index, url) in validUrls.enumerated() {
+                await importSingleImage(from: url)
+                importingCount = index + 1
+                importProgress = Double(importingCount) / Double(totalImportCount)
+            }
+            
+            importProgress = 1.0
+            showSuccess("Imported \(validUrls.count) image\(validUrls.count == 1 ? "" : "s") successfully")
+            loadInitialData()
+            
+            // Reset progress after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                self.importProgress = 0.0
+                self.importingCount = 0
+                self.totalImportCount = 0
+            }
+        }
+    }
+    
+    private func importSingleImage(from url: URL) async {
+        guard url.startAccessingSecurityScopedResource() else { return }
+        defer { url.stopAccessingSecurityScopedResource() }
+        
+        let originalName = url.lastPathComponent
+        
+        guard let savedPath = fileManagerService.saveImage(from: url, originalName: originalName) else {
+            print("Failed to save image: \(originalName)")
+            return
+        }
+        
+        let now = Date()
+        let newImage = MemeImage(
+            databaseId: nil,
+            filename: URL(fileURLWithPath: savedPath).lastPathComponent,
+            originalName: originalName,
+            path: savedPath,
+            createdDate: now,
+            updatedDate: now
+        )
+        
+        _ = databaseService.createImage(newImage)
+    }
+    
+    func importFromClipboard() {
+        guard let image = clipboardService.getImageFromClipboard() else {
+            showError("No image found in clipboard")
+            return
+        }
+        
+        isLoading = true
+        updateStatus("Importing image from clipboard...")
+        
+        Task {
+            if let tempURL = await saveImageToTemp(image: image) {
+                await importSingleImage(from: tempURL)
+                try? FileManager.default.removeItem(at: tempURL)
+                await MainActor.run {
+                    showSuccess("Image imported from clipboard")
+                    loadInitialData()
+                }
+            } else {
+                await MainActor.run {
+                    showError("Failed to process clipboard image")
+                    isLoading = false
+                }
+            }
+        }
+    }
+    
+    func hasClipboardImage() -> Bool {
+        return clipboardService.hasImageInClipboard()
+    }
+    
+    private func saveImageToTemp(image: NSImage) async -> URL? {
+        guard let tiffData = image.tiffRepresentation,
+              let bitmapRep = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
+            return nil
+        }
+        
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("png")
+        
+        do {
+            try pngData.write(to: tempURL)
+            return tempURL
+        } catch {
+            print("Failed to save temp image: \(error)")
+            return nil
+        }
+    }
+    
+    func copyImageToClipboard(_ image: MemeImage) {
+        Task {
+            let success = clipboardService.copyImageFileToClipboard(from: URL(fileURLWithPath: image.path))
+            
+            await MainActor.run {
+                if success {
+                    showSuccess("Image copied to clipboard")
+                } else {
+                    showError("Failed to copy image to clipboard")
+                }
+            }
+        }
+    }
+    
+    func deleteImage(_ image: MemeImage) {
+        guard let imageId = image.databaseId else { 
+            showError("Cannot delete image: Invalid image ID")
+            return 
+        }
+        
+        if databaseService.deleteImage(id: imageId) {
+            try? FileManager.default.removeItem(atPath: image.path)
+            showSuccess("Image deleted successfully")
+            loadInitialData()
+        } else {
+            showError("Failed to delete image")
+        }
+    }
+    
+    func addTagsToImage(_ image: MemeImage, tagNames: [String]) {
+        guard let imageId = image.databaseId else { 
+            showError("Cannot add tags: Invalid image ID")
+            return 
+        }
+        
+        let validTags = tagNames.filter { !$0.isEmpty }
+        guard !validTags.isEmpty else {
+            showError("No valid tags to add")
+            return
+        }
+        
+        if databaseService.addTagsToImage(imageId: imageId, tagNames: validTags) {
+            showSuccess("Tags added successfully")
+            loadInitialData()
+        } else {
+            showError("Failed to add tags")
+        }
+    }
+    
+    func removeTagFromImage(_ image: MemeImage, tag: Tag) {
+        guard let imageId = image.databaseId else { 
+            showError("Cannot remove tag: Invalid image ID")
+            return 
+        }
+        
+        if databaseService.removeTagFromImage(imageId: imageId, tagId: tag.id) {
+            showSuccess("Tag removed successfully")
+            loadInitialData()
+        } else {
+            showError("Failed to remove tag")
+        }
+    }
+    
+    func toggleTagFilter(_ tagName: String) {
+        if selectedTags.contains(tagName) {
+            selectedTags.remove(tagName)
+        } else {
+            selectedTags.insert(tagName)
+        }
+    }
+    
+    func clearFilters() {
+        searchText = ""
+        selectedTags.removeAll()
+    }
+    
+    func clearSelectedImage() {
+        selectedImage = nil
+    }
+    
+    func renameImage(_ image: MemeImage, newName: String) {
+        guard let imageId = image.databaseId else { 
+            showError("Cannot rename image: Invalid image ID")
+            return 
+        }
+        
+        guard !newName.isEmpty else {
+            showError("Image name cannot be empty")
+            return
+        }
+        
+        if databaseService.updateImageName(id: imageId, newName: newName) {
+            showSuccess("Image renamed successfully")
+            loadInitialData()
+        } else {
+            showError("Failed to rename image")
+        }
+    }
+    
+    func showError(_ message: String) {
+        errorMessage = message
+        showingError = true
+    }
+    
+    private func showSuccess(_ message: String) {
+        successMessage = message
+        showingSuccess = true
+    }
+    
+    private func updateStatus(_ message: String) {
+        // For now, we'll use success messages for status updates
+        // In a future version, we could add a dedicated status system
+        showSuccess(message)
+    }
+    
+    func showImageInFinder(_ image: MemeImage) {
+        let url = URL(fileURLWithPath: image.path)
+        NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
+    }
+}
+</file>
+
+<file path="MemeManager/Views/Components/ImageDetailView.swift">
+import SwiftUI
+
+struct ImageDetailView: View {
+    let image: MemeImage
+    @EnvironmentObject var viewModel: MemeManagerViewModel
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var showingTagEditor = false
+    @State private var showingDeleteConfirmation = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Custom header
+            HStack {
+                Text("Image Details")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button(action: { 
+                    Task { @MainActor in
+                        viewModel.clearSelectedImage()
+                        dismiss()
+                    }
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Close")
+            }
+            .padding()
+            .background(Color(NSColor.controlBackgroundColor))
+            
+            Divider()
+            
+            ScrollView {
+                VStack(spacing: 16) {
+                // Image preview
+                AsyncImage(url: URL(fileURLWithPath: image.path)) { phase in
+                    switch phase {
+                    case .success(let loadedImage):
+                        loadedImage
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxWidth: .infinity, maxHeight: 400)
+                            .cornerRadius(12)
+                    case .failure(_):
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.red.opacity(0.3))
+                            .frame(height: 200)
+                            .overlay(
+                                VStack {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.system(size: 32))
+                                        .foregroundColor(.red)
+                                    Text("Failed to load image")
+                                        .foregroundColor(.red)
+                                }
+                            )
+                    case .empty:
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 200)
+                            .overlay(ProgressView())
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                
+                // Image details
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("Name")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(image.originalName)
+                                .font(.headline)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing) {
+                            Text("Created")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(image.createdDate, style: .date)
+                                .font(.subheadline)
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // Tags section
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Tags")
+                                .font(.headline)
+                            Spacer()
+                            Button(action: { showingTagEditor = true }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(.blue)
+                            }
+                            .help("Add tags to organize this image")
+                        }
+                        
+                        if image.tags.isEmpty {
+                            Text("No tags")
+                                .foregroundColor(.secondary)
+                                .italic()
+                        } else {
+                            LazyVGrid(columns: [
+                                GridItem(.adaptive(minimum: 80), spacing: 8)
+                            ], spacing: 8) {
+                                ForEach(image.tags, id: \.id) { tag in
+                                    TagChip(tag: tag) {
+                                        viewModel.removeTagFromImage(image, tag: tag)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(NSColor.controlBackgroundColor))
+                .cornerRadius(12)
+                
+                // Action buttons
+                HStack(spacing: 16) {
+                    Button("Copy to Clipboard") {
+                        viewModel.copyImageToClipboard(image)
+                    }
+                    .buttonStyle(.bordered)
+                    .help("Copy image to clipboard for sharing")
+                    
+                    Button("Delete", role: .destructive) {
+                        showingDeleteConfirmation = true
+                    }
+                    .buttonStyle(.bordered)
+                    .help("Delete this image permanently")
+                }
+                .padding(.top, 16)
+                }
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+        }
+        .sheet(isPresented: $showingTagEditor) {
+            TagEditorSheet(image: image)
+                .environmentObject(viewModel)
+        }
+        .alert("Delete Image", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                Task { @MainActor in
+                    viewModel.deleteImage(image)
+                    viewModel.clearSelectedImage()
+                    dismiss()
+                }
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(image.originalName)\"? This action cannot be undone.")
+        }
+        .frame(minWidth: 500, minHeight: 600)
+    }
+}
+
+struct TagChip: View {
+    let tag: Tag
+    let onRemove: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(tag.name)
+                .font(.caption)
+                .fontWeight(.medium)
+                .lineLimit(1)
+            
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.blue.opacity(0.15))
+        .foregroundColor(.blue)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.blue.opacity(0.3), lineWidth: 0.5)
+        )
+    }
+}
+</file>
+
+<file path="MemeManager/Views/Components/ImageGridView.swift">
+import SwiftUI
+import UniformTypeIdentifiers
+
+struct ImageGridView: View {
+    @EnvironmentObject var viewModel: MemeManagerViewModel
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: AppConstants.gridSpacing), count: AppConstants.gridColumns)
+    @State private var isDropTargeted = false
+    
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: AppConstants.gridSpacing) {
+                ForEach(viewModel.images) { image in
+                    ImageThumbnailView(image: image)
+                        .onTapGesture {
+                            viewModel.selectedImage = image
+                        }
+                }
+            }
+            .padding()
+        }
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            handleDrop(providers: providers)
+        }
+        .overlay(
+            // Drop zone overlay when dragging
+            isDropTargeted ? 
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.accentColor, lineWidth: 3)
+                .background(Color.accentColor.opacity(0.1))
+                .overlay(
+                    VStack {
+                        Image(systemName: "photo.badge.plus")
+                            .font(.system(size: 48))
+                            .foregroundColor(.accentColor)
+                        Text("Drop images here")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.accentColor)
+                    }
+                )
+                .padding(20)
+            : nil
+        )
+        .sheet(item: $viewModel.selectedImage) { image in
+            ImageDetailView(image: image)
+                .environmentObject(viewModel)
+        }
+    }
+    
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        var urls: [URL] = []
+        let group = DispatchGroup()
+        
+        for provider in providers {
+            group.enter()
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
+                defer { group.leave() }
+                
+                if let data = item as? Data,
+                   let url = URL(dataRepresentation: data, relativeTo: nil) {
+                    urls.append(url)
+                }
+            }
+        }
+        
+        group.notify(queue: .main) {
+            if !urls.isEmpty {
+                // Filter for valid image files
+                let imageUrls = urls.filter { url in
+                    viewModel.imageProcessingService.validateImageFile(at: url)
+                }
+                
+                if !imageUrls.isEmpty {
+                    viewModel.importImages(from: imageUrls)
+                } else {
+                    viewModel.showError("No valid image files found in dropped items")
+                }
+            }
+        }
+        
+        return true
+    }
+}
+</file>
+
+<file path="MemeManager/Views/Components/ImageThumbnailView.swift">
+import SwiftUI
+
+struct ImageThumbnailView: View {
+    let image: MemeImage
+    @EnvironmentObject var viewModel: MemeManagerViewModel
+    @State private var showingRenameAlert = false
+    @State private var showingDeleteConfirmation = false
+    @State private var newName = ""
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            AsyncImage(url: URL(fileURLWithPath: image.path)) { phase in
+                switch phase {
+                case .success(let loadedImage):
+                    loadedImage
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: AppConstants.thumbnailSize.width, height: AppConstants.thumbnailSize.height)
+                        .clipped()
+                        .cornerRadius(8)
+                case .failure(_):
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.red.opacity(0.3))
+                        .frame(width: AppConstants.thumbnailSize.width, height: AppConstants.thumbnailSize.height)
+                        .overlay(
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 24))
+                                .foregroundColor(.red)
+                        )
+                case .empty:
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: AppConstants.thumbnailSize.width, height: AppConstants.thumbnailSize.height)
+                        .overlay(
+                            ProgressView()
+                        )
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            
+            VStack(spacing: 2) {
+                Text(image.originalName)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                
+                if !image.tags.isEmpty {
+                    HStack {
+                        ForEach(image.tags.prefix(3), id: \.id) { tag in
+                            Text(tag.name)
+                                .font(.caption2)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.blue.opacity(0.2))
+                                .foregroundColor(.blue)
+                                .cornerRadius(4)
+                        }
+                        if image.tags.count > 3 {
+                            Text("+\(image.tags.count - 3)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            .frame(width: AppConstants.thumbnailSize.width)
+        }
+        .contextMenu {
+            Button("Copy to Clipboard") {
+                viewModel.copyImageToClipboard(image)
+            }
+            
+            Button("Show in Finder") {
+                viewModel.showImageInFinder(image)
+            }
+            
+            Divider()
+            
+            Button("Rename") {
+                newName = image.originalName
+                showingRenameAlert = true
+            }
+            
+            Button("Edit Tags...") {
+                viewModel.selectedImage = image
+            }
+            
+            Divider()
+            
+            Button("Delete", role: .destructive) {
+                showingDeleteConfirmation = true
+            }
+        }
+        .alert("Rename Image", isPresented: $showingRenameAlert) {
+            TextField("New name", text: $newName)
+            Button("Cancel", role: .cancel) { }
+            Button("Rename") {
+                viewModel.renameImage(image, newName: newName.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
+        .alert("Delete Image", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                viewModel.deleteImage(image)
+            }
+        } message: {
+            Text("Are you sure you want to delete \"\(image.originalName)\"? This action cannot be undone.")
+        }
+    }
+}
+</file>
+
+<file path="MemeManager/Views/Main/MainView.swift">
+import SwiftUI
+
+struct MainView: View {
+    @EnvironmentObject var viewModel: MemeManagerViewModel
+    
+    var body: some View {
+        VStack {
+            if viewModel.isLoading {
+                VStack(spacing: 16) {
+                    if viewModel.totalImportCount > 0 {
+                        ProgressView("Importing images...", value: viewModel.importProgress, total: 1.0)
+                            .progressViewStyle(LinearProgressViewStyle())
+                            .frame(width: 300)
+                        
+                        Text("\(viewModel.importingCount) of \(viewModel.totalImportCount) images imported")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        ProgressView("Loading...")
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.images.isEmpty {
+                EmptyStateView()
+            } else {
+                ImageGridView()
+            }
+        }
+        .padding()
+    }
+}
+
+struct EmptyStateView: View {
+    @EnvironmentObject var viewModel: MemeManagerViewModel
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "photo.on.rectangle.angled")
+                .font(.system(size: 64))
+                .foregroundColor(.secondary)
+            
+            Text("No Memes Yet")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            Text("Drag & drop images here or use the import buttons")
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            
+            HStack(spacing: 16) {
+                Button("Import Images") {
+                    let panel = NSOpenPanel()
+                    panel.allowedContentTypes = [.image]
+                    panel.allowsMultipleSelection = true
+                    panel.canChooseDirectories = false
+                    panel.canChooseFiles = true
+                    
+                    if panel.runModal() == .OK {
+                        viewModel.importImages(from: panel.urls)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                
+                Button("From Clipboard") {
+                    viewModel.importFromClipboard()
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+</file>
+
+<file path="MemeManager/Views/Main/SidebarView.swift">
+import SwiftUI
+
+struct SidebarView: View {
+    @EnvironmentObject var viewModel: MemeManagerViewModel
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // Import Section
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Import")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                VStack(spacing: 8) {
+                    Button(action: {
+                        let panel = NSOpenPanel()
+                        panel.allowedContentTypes = [.image]
+                        panel.allowsMultipleSelection = true
+                        panel.canChooseDirectories = false
+                        panel.canChooseFiles = true
+                        
+                        if panel.runModal() == .OK {
+                            viewModel.importImages(from: panel.urls)
+                        }
+                    }) {
+                        Label("Import Images", systemImage: "plus.circle")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.large)
+                    .help("Select images from your computer to import")
+                    
+                    Button(action: {
+                        viewModel.importFromClipboard()
+                    }) {
+                        Label("From Clipboard", systemImage: "doc.on.clipboard")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.large)
+                    .help("Import image from clipboard (⌘⇧V)")
+                }
+            }
+            
+            Divider()
+            
+            // Search Section
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text("Search")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    if !viewModel.searchText.isEmpty || !viewModel.selectedTags.isEmpty {
+                        Button("Clear") {
+                            viewModel.clearFilters()
+                        }
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .buttonStyle(.borderless)
+                        .help("Clear all search filters (ESC)")
+                    }
+                }
+                
+                SearchBar()
+                
+                // Tag filters
+                if !viewModel.allTags.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Filter by Tags")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                        
+                        LazyVGrid(columns: [
+                            GridItem(.adaptive(minimum: 70), spacing: 6)
+                        ], spacing: 6) {
+                            ForEach(viewModel.allTags, id: \.id) { tag in
+                                FilterTagChip(
+                                    tag: tag,
+                                    isSelected: viewModel.selectedTags.contains(tag.name)
+                                ) {
+                                    viewModel.toggleTagFilter(tag.name)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Stats
+            if !viewModel.images.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Divider()
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(viewModel.images.count)")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                            Text("memes")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(viewModel.allTags.count)")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                            Text("tags")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .frame(minWidth: 220)
+    }
+}
+
+struct SearchBar: View {
+    @EnvironmentObject var viewModel: MemeManagerViewModel
+    
+    var body: some View {
+        TextField("Search memes...", text: $viewModel.searchText)
+            .textFieldStyle(.roundedBorder)
+            .help("Search by image name or content")
+    }
+}
+
+struct FilterTagChip: View {
+    let tag: Tag
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            Text(tag.name)
+                .font(.caption)
+                .fontWeight(.medium)
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.blue : Color.gray.opacity(0.2))
+                .foregroundColor(isSelected ? .white : .primary)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isSelected ? Color.blue : Color.gray.opacity(0.4), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+</file>
+
+<file path="MemeManager/Views/Sheets/TagEditorSheet.swift">
+import SwiftUI
+
+struct TagEditorSheet: View {
+    let image: MemeImage
+    @EnvironmentObject var viewModel: MemeManagerViewModel
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var newTagText = ""
+    @FocusState private var isTextFieldFocused: Bool
+    
+    var suggestedTags: [String] {
+        let allTags = viewModel.images.flatMap { $0.tags.map { $0.name } }
+        let uniqueTags = Array(Set(allTags)).sorted()
+        let currentTagNames = Set(image.tags.map { $0.name })
+        return uniqueTags.filter { !currentTagNames.contains($0) && $0.localizedCaseInsensitiveContains(newTagText) }
+    }
+    
+    var parsedTags: [String] {
+        guard !newTagText.isEmpty else { return [] }
+        return newTagText.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // Header
+            HStack {
+                Text("Add Tags")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button("Cancel") {
+                    dismiss()
+                }
+            }
+            .padding()
+            
+            // Current tags display
+            if !image.tags.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Current Tags:")
+                        .font(.headline)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(image.tags, id: \.id) { tag in
+                                HStack(spacing: 4) {
+                                    Text(tag.name)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                    
+                                    Button(action: {
+                                        viewModel.removeTagFromImage(image, tag: tag)
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.blue.opacity(0.2))
+                                .cornerRadius(8)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            
+            // Simple text input - back to regular SwiftUI TextField
+            VStack(alignment: .leading, spacing: 8) {
+                Text("New Tags (comma separated):")
+                    .font(.headline)
+                
+                TextField("Enter tags separated by commas...", text: $newTagText)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($isTextFieldFocused)
+                    .onSubmit {
+                        addTags()
+                        dismiss()
+                    }
+            }
+            .padding(.horizontal)
+            
+            // Preview tags
+            if !parsedTags.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Preview:")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(parsedTags, id: \.self) { tag in
+                                Text(tag)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.green.opacity(0.2))
+                                    .cornerRadius(8)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            
+            // Suggestions
+            if !suggestedTags.isEmpty && !newTagText.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Suggestions:")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(suggestedTags.prefix(8), id: \.self) { tag in
+                                Button(action: {
+                                    addSuggestedTag(tag)
+                                }) {
+                                    Text(tag)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.gray.opacity(0.2))
+                                        .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            
+            // Action buttons
+            HStack(spacing: 16) {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.escape)
+                
+                Button("Add Tags") {
+                    addTags()
+                    dismiss()
+                }
+                .keyboardShortcut(.return)
+                .disabled(newTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .padding()
+            
+            Spacer()
+        }
+        .frame(minWidth: 500, minHeight: 350)
+        .onAppear {
+            isTextFieldFocused = true
+        }
+    }
+    
+    private func addTags() {
+        let tagNames = parsedTags
+        if !tagNames.isEmpty {
+            viewModel.addTagsToImage(image, tagNames: tagNames)
+            newTagText = ""
+        }
+    }
+    
+    private func addSuggestedTag(_ tag: String) {
+        if newTagText.isEmpty {
+            newTagText = tag
+        } else {
+            newTagText += ", " + tag
+        }
+    }
+}
+</file>
+
+<file path=".gitignore">
+# Xcode
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+
+# Build products
+build/
+DerivedData/
+.build/
+
+# Various settings
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+
+# Other
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved
+</file>
+
+<file path="Package.swift">
+// swift-tools-version: 5.9
+import PackageDescription
+
+let package = Package(
+    name: "MemeManager",
+    platforms: [
+        .macOS(.v14)
+    ],
+    products: [
+        .executable(name: "MemeManager", targets: ["MemeManager"])
+    ],
+    dependencies: [
+        .package(url: "https://github.com/stephencelis/SQLite.swift", from: "0.14.1")
+    ],
+    targets: [
+        .executableTarget(
+            name: "MemeManager",
+            dependencies: [
+                .product(name: "SQLite", package: "SQLite.swift")
+            ],
+            path: "MemeManager",
+            resources: [
+                .copy("Resources/MemeManager.entitlements")
+            ]
+        )
+    ]
+)
+</file>
+
+</files>
