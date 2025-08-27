@@ -1,4 +1,19 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+// MARK: - Shared Functions
+@MainActor
+private func openFileDialog(viewModel: MemeManagerViewModel) {
+    let panel = NSOpenPanel()
+    panel.allowedContentTypes = [.image]
+    panel.allowsMultipleSelection = true
+    panel.canChooseDirectories = false
+    panel.canChooseFiles = true
+    
+    if panel.runModal() == .OK {
+        viewModel.importImages(from: panel.urls)
+    }
+}
 
 struct MainView: View {
     @EnvironmentObject var viewModel: MemeManagerViewModel
@@ -49,22 +64,16 @@ struct EmptyStateView: View {
             
             HStack(spacing: 16) {
                 Button("Import Images") {
-                    let panel = NSOpenPanel()
-                    panel.allowedContentTypes = [.image]
-                    panel.allowsMultipleSelection = true
-                    panel.canChooseDirectories = false
-                    panel.canChooseFiles = true
-                    
-                    if panel.runModal() == .OK {
-                        viewModel.importImages(from: panel.urls)
-                    }
+                    openFileDialog(viewModel: viewModel)
                 }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut("o", modifiers: .command)
                 
                 Button("From Clipboard") {
                     viewModel.importFromClipboard()
                 }
                 .buttonStyle(.bordered)
+                .keyboardShortcut("v", modifiers: .command)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -6,19 +6,29 @@ struct ImageThumbnailView: View {
     @State private var showingRenameAlert = false
     @State private var showingDeleteConfirmation = false
     @State private var newName = ""
+    @State private var thumbnailImage: NSImage?
+    @State private var isLoadingThumbnail = true
     
     var body: some View {
         VStack(spacing: 8) {
-            AsyncImage(url: URL(fileURLWithPath: image.path)) { phase in
-                switch phase {
-                case .success(let loadedImage):
-                    loadedImage
+            Group {
+                if let thumbnailImage = thumbnailImage {
+                    Image(nsImage: thumbnailImage)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: AppConstants.thumbnailSize.width, height: AppConstants.thumbnailSize.height)
                         .clipped()
                         .cornerRadius(8)
-                case .failure(_):
+                } else if isLoadingThumbnail {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: AppConstants.thumbnailSize.width, height: AppConstants.thumbnailSize.height)
+                        .overlay(
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .secondary))
+                                .scaleEffect(0.8)
+                        )
+                } else {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color.red.opacity(0.3))
                         .frame(width: AppConstants.thumbnailSize.width, height: AppConstants.thumbnailSize.height)
@@ -27,16 +37,10 @@ struct ImageThumbnailView: View {
                                 .font(.system(size: 24))
                                 .foregroundColor(.red)
                         )
-                case .empty:
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: AppConstants.thumbnailSize.width, height: AppConstants.thumbnailSize.height)
-                        .overlay(
-                            ProgressView()
-                        )
-                @unknown default:
-                    EmptyView()
                 }
+            }
+            .task {
+                await loadThumbnail()
             }
             
             VStack(spacing: 2) {
@@ -108,5 +112,10 @@ struct ImageThumbnailView: View {
         } message: {
             Text("Are you sure you want to delete \"\(image.originalName)\"? This action cannot be undone.")
         }
+    }
+    
+    private func loadThumbnail() async {
+        thumbnailImage = await viewModel.thumbnailManager.getThumbnail(for: image)
+        isLoadingThumbnail = false
     }
 }

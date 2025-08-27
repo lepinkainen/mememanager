@@ -45,7 +45,7 @@ class ThumbnailManager: ObservableObject {
         }
         
         // Check if thumbnail file exists
-        let thumbnailPath = fileManager.getThumbnailPath(for: image.filename)
+        let thumbnailPath = fileManager.getThumbnailPath(for: image)
         if FileManager.default.fileExists(atPath: thumbnailPath.path) {
             if let thumbnail = NSImage(contentsOf: thumbnailPath) {
                 await cache.setThumbnail(thumbnail, for: cacheKey)
@@ -90,7 +90,7 @@ class ThumbnailManager: ObservableObject {
     }
     
     func deleteThumbnail(for image: MemeImage) {
-        let thumbnailPath = fileManager.getThumbnailPath(for: image.filename)
+        let thumbnailPath = fileManager.getThumbnailPath(for: image)
         try? FileManager.default.removeItem(at: thumbnailPath)
     }
 }

@@ -16,4 +16,7 @@ struct AppConstants {
     // UI
     static let gridColumns = 4
     static let gridSpacing: CGFloat = 10
+    
+    // Pagination
+    static let pageSize = 50
 }

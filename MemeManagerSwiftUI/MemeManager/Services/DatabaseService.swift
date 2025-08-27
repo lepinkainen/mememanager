@@ -78,6 +78,14 @@ class DatabaseService: ObservableObject {
                 t.foreignKey(jtTagId, references: tags, tagId, delete: .cascade)
             })
             
+            // Create indexes for better search performance
+            try db?.run("CREATE INDEX IF NOT EXISTS idx_images_original_name ON images(original_name)")
+            try db?.run("CREATE INDEX IF NOT EXISTS idx_images_filename ON images(filename)")
+            try db?.run("CREATE INDEX IF NOT EXISTS idx_images_created_date ON images(created_date)")
+            try db?.run("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
+            try db?.run("CREATE INDEX IF NOT EXISTS idx_image_tags_image_id ON image_tags(image_id)")
+            try db?.run("CREATE INDEX IF NOT EXISTS idx_image_tags_tag_id ON image_tags(tag_id)")
+            
             print("Database tables created successfully")
         } catch {
             print("Failed to create tables: \(error)")
@@ -104,12 +112,18 @@ class DatabaseService: ObservableObject {
         }
     }
     
-    func getAllImages() -> [MemeImage] {
+    func getAllImages(limit: Int? = nil, offset: Int? = nil) -> [MemeImage] {
         guard let db = db else { return [] }
         
         do {
             var memeImages: [MemeImage] = []
-            for row in try db.prepare(images.order(imageCreatedDate.desc)) {
+            var query = images.order(imageCreatedDate.desc)
+            
+            if let limit = limit {
+                query = query.limit(limit, offset: offset ?? 0)
+            }
+            
+            for row in try db.prepare(query) {
                 let image = MemeImage(
                     databaseId: row[imageId],
                     filename: row[imageFilename],
@@ -125,6 +139,17 @@ class DatabaseService: ObservableObject {
         } catch {
             print("Failed to fetch images: \(error)")
             return []
+        }
+    }
+    
+    func getTotalImageCount() -> Int {
+        guard let db = db else { return 0 }
+        
+        do {
+            return try db.scalar(images.count)
+        } catch {
+            print("Failed to get image count: \(error)")
+            return 0
         }
     }
     
@@ -360,19 +385,23 @@ class DatabaseService: ObservableObject {
     }
     
     // MARK: - Search Operations
-    func searchImages(query: String) -> [MemeImage] {
+    func searchImages(query: String, limit: Int? = nil, offset: Int? = nil) -> [MemeImage] {
         guard let db = db else { return [] }
         
         if query.isEmpty {
-            return getAllImages()
+            return getAllImages(limit: limit, offset: offset)
         }
         
         do {
             var memeImages: [MemeImage] = []
-            let searchQuery = images.filter(
+            var searchQuery = images.filter(
                 imageOriginalName.like("%\(query)%") ||
                 imageFilename.like("%\(query)%")
             ).order(imageCreatedDate.desc)
+            
+            if let limit = limit {
+                searchQuery = searchQuery.limit(limit, offset: offset ?? 0)
+            }
             
             for row in try db.prepare(searchQuery) {
                 let image = MemeImage(
@@ -396,7 +425,7 @@ class DatabaseService: ObservableObject {
     func searchImagesByTags(tagNames: [String]) -> [MemeImage] {
         guard !tagNames.isEmpty else { return [] }
         
-        // Simple approach: get all images and filter by tags in memory
+        // For now, use the improved approach with better database filtering
         let allImages = getAllImages()
         return allImages.filter { image in
             let imageTags = image.tags.map { $0.name.lowercased() }
@@ -419,7 +448,7 @@ class DatabaseService: ObservableObject {
             return searchImagesByTags(tagNames: tagNames)
         }
         
-        // Combine text and tag search
+        // Combine text and tag search: first filter by text, then by tags
         let textResults = searchImages(query: textQuery)
         return textResults.filter { image in
             let imageTags = image.tags.map { $0.name.lowercased() }

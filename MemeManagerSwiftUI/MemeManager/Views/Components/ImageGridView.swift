@@ -3,22 +3,60 @@ import UniformTypeIdentifiers
 
 struct ImageGridView: View {
     @EnvironmentObject var viewModel: MemeManagerViewModel
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: AppConstants.gridSpacing), count: AppConstants.gridColumns)
     @State private var isDropTargeted = false
+    @State private var containerWidth: CGFloat = 0
+    
+    private var adaptiveColumns: [GridItem] {
+        let minColumnWidth: CGFloat = AppConstants.thumbnailSize.width + AppConstants.gridSpacing
+        let maxColumns = max(1, Int(containerWidth / minColumnWidth))
+        let columnCount = min(maxColumns, 6) // Maximum 6 columns
+        return Array(repeating: GridItem(.flexible(), spacing: AppConstants.gridSpacing), count: columnCount)
+    }
     
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: AppConstants.gridSpacing) {
+        GeometryReader { geometry in
+            ScrollView {
+                LazyVGrid(columns: adaptiveColumns, spacing: AppConstants.gridSpacing) {
                 ForEach(viewModel.images) { image in
                     ImageThumbnailView(image: image)
                         .onTapGesture {
                             viewModel.selectedImage = image
                         }
+                        .onAppear {
+                            // Load more images when reaching the last 10 items
+                            if let lastImage = viewModel.images.last,
+                               image.id == lastImage.id,
+                               viewModel.images.count >= 10 {
+                                viewModel.loadMoreImages()
+                            }
+                        }
+                }
+                
+                // Loading indicator for pagination
+                if viewModel.isLoadingMore {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 8) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                            Text("Loading more...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding()
+                }
+                }
+                .padding()
+                .onAppear {
+                    containerWidth = geometry.size.width - 40 // Account for padding
+                }
+                .onChange(of: geometry.size.width) { _, newWidth in
+                    containerWidth = newWidth - 40 // Account for padding
                 }
             }
-            .padding()
-        }
-        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers: providers)
         }
         .overlay(
@@ -44,6 +82,7 @@ struct ImageGridView: View {
         .sheet(item: $viewModel.selectedImage) { image in
             ImageDetailView(image: image)
                 .environmentObject(viewModel)
+        }
         }
     }
     

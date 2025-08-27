@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
-    @StateObject private var viewModel = MemeManagerViewModel()
+    @EnvironmentObject var viewModel: MemeManagerViewModel
     
     var body: some View {
         NavigationSplitView {

@@ -77,6 +77,18 @@ class FileManagerService {
         }
     }
     
+    func getThumbnailPath(for image: MemeImage) -> URL {
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: image.createdDate)
+        let month = calendar.component(.month, from: image.createdDate)
+        
+        let thumbnailDirectory = getThumbnailURL(for: year, month: month)
+        let thumbnailFilename = (image.filename as NSString).deletingPathExtension + "_thumb.jpg"
+        
+        return thumbnailDirectory.appendingPathComponent(thumbnailFilename)
+    }
+    
+    // Legacy method for backward compatibility
     func getThumbnailPath(for filename: String) -> URL {
         let now = Date()
         let calendar = Calendar.current

@@ -17,12 +17,17 @@ class MemeManagerViewModel: ObservableObject {
     @Published var importProgress: Double = 0.0
     @Published var importingCount: Int = 0
     @Published var totalImportCount: Int = 0
+    @Published var hasMoreImages: Bool = true
+    @Published var isLoadingMore: Bool = false
+    
+    private var currentOffset: Int = 0
+    private let pageSize = AppConstants.pageSize
     
     private let databaseService = DatabaseService.shared
     private let fileManagerService = FileManagerService.shared
     let imageProcessingService = ImageProcessingService.shared
     private let clipboardService = ClipboardService()
-    private lazy var thumbnailManager = ThumbnailManager(
+    lazy var thumbnailManager = ThumbnailManager(
         imageProcessor: imageProcessingService,
         fileManager: fileManagerService
     )
@@ -45,24 +50,61 @@ class MemeManagerViewModel: ObservableObject {
     
     func loadInitialData() {
         isLoading = true
+        currentOffset = 0
+        images = []
         
         Task {
-            images = databaseService.getAllImages()
+            let newImages = databaseService.getAllImages(limit: pageSize, offset: currentOffset)
+            let totalCount = databaseService.getTotalImageCount()
+            
+            images = newImages
             allTags = databaseService.getAllTags()
+            hasMoreImages = newImages.count == pageSize && (currentOffset + newImages.count) < totalCount
+            currentOffset = newImages.count
             isLoading = false
         }
     }
     
     private func performSearch(text: String, tags: [String]) {
         isLoading = true
+        currentOffset = 0
+        images = []
         
         Task {
+            let newImages: [MemeImage]
             if text.isEmpty && tags.isEmpty {
-                images = databaseService.getAllImages()
+                newImages = databaseService.getAllImages(limit: pageSize, offset: currentOffset)
             } else {
-                images = databaseService.searchImagesWithTextAndTags(textQuery: text, tagNames: tags)
+                newImages = databaseService.searchImagesWithTextAndTags(textQuery: text, tagNames: tags)
             }
+            
+            images = newImages
+            hasMoreImages = text.isEmpty && tags.isEmpty && newImages.count == pageSize
+            currentOffset = newImages.count
             isLoading = false
+        }
+    }
+    
+    func loadMoreImages() {
+        guard hasMoreImages && !isLoadingMore && !isLoading else { return }
+        
+        isLoadingMore = true
+        
+        Task {
+            let newImages: [MemeImage]
+            if searchText.isEmpty && selectedTags.isEmpty {
+                newImages = databaseService.getAllImages(limit: pageSize, offset: currentOffset)
+            } else {
+                // For now, search results are not paginated - they load all at once
+                isLoadingMore = false
+                return
+            }
+            
+            let totalCount = databaseService.getTotalImageCount()
+            images.append(contentsOf: newImages)
+            hasMoreImages = newImages.count == pageSize && (currentOffset + newImages.count) < totalCount
+            currentOffset += newImages.count
+            isLoadingMore = false
         }
     }
     
